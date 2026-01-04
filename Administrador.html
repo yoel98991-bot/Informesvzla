@@ -4,10 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Panel Administrador</title>
+    <title>Panel Administrador - Estadísticas</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    
     <style>
         /* --- Reset & Variables --- */
         * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
@@ -21,9 +23,10 @@
             --accent: #007aff;
             --radius: 16px;
             --shadow: 0 4px 20px rgba(0,0,0,0.05);
-            /* Colores específicos para indicadores */
-            --color-study-active: #ff9500;
-            --color-study-empty: #d1d1d6;
+            
+            /* Colores específicos */
+            --color-study-active: #ff9500; 
+            --color-study-empty: #d1d1d6;  
         }
         body {
             font-family: 'Inter', sans-serif; background-color: var(--bg); color: var(--text-main);
@@ -37,73 +40,85 @@
         }
         .login-card {
             background: var(--surface); padding: 40px 30px; border-radius: 24px; width: 100%; max-width: 360px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1); text-align: center; animation: floatUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1); text-align: center;
         }
         .login-card h1 { font-family: 'Playfair Display', serif; font-size: 1.8rem; margin-bottom: 8px; }
-        .login-card p { color: var(--text-secondary); margin-bottom: 30px; font-size: 0.9rem; }
-        .input-wrapper { position: relative; margin-bottom: 20px; }
+        .input-wrapper { margin-bottom: 20px; margin-top: 20px;}
         input[type="password"] {
             width: 100%; padding: 16px; border-radius: 12px; border: 1px solid var(--border);
-            background: var(--bg); font-size: 1rem; text-align: center; letter-spacing: 4px; transition: all 0.3s;
+            background: var(--bg); font-size: 1rem; text-align: center; letter-spacing: 4px;
         }
-        input:focus { border-color: var(--primary); background: var(--surface); }
         .btn-login {
             width: 100%; padding: 16px; background: var(--primary); color: white; border: none;
-            border-radius: 12px; font-weight: 600; font-size: 1rem; cursor: pointer;
+            border-radius: 12px; font-weight: 600; cursor: pointer;
         }
 
-        /* --- DASHBOARD --- */
+        /* --- DASHBOARD HEADER --- */
         #dashboard-view { display: none; height: 100%; flex-direction: column; }
+        
         header {
-            background: rgba(255,255,255,0.85); backdrop-filter: blur(20px); padding: 20px 24px;
-            padding-top: max(20px, env(safe-area-inset-top)); border-bottom: 1px solid var(--border);
-            display: flex; justify-content: space-between; align-items: center; z-index: 10;
+            background: rgba(255,255,255,0.9); backdrop-filter: blur(20px); 
+            padding: 16px 24px; padding-top: max(16px, env(safe-area-inset-top));
+            border-bottom: 1px solid var(--border); z-index: 10;
         }
+        
+        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
         header h2 { font-family: 'Playfair Display', serif; font-size: 1.5rem; }
-        .btn-logout { background: transparent; border: none; color: var(--text-secondary); font-size: 0.9rem; font-weight: 500; cursor: pointer; }
+        .btn-logout { background: transparent; border: none; color: var(--text-secondary); cursor: pointer; }
 
-        /* --- Stats Cards (Grid 2x2) --- */
+        /* Filtro de Mes */
+        .month-filter-container {
+            display: flex; align-items: center; gap: 10px; background: var(--bg);
+            padding: 8px 12px; border-radius: 12px;
+        }
+        .month-filter-container i { color: var(--text-secondary); }
+        input[type="month"] {
+            border: none; background: transparent; font-family: 'Inter', sans-serif;
+            font-size: 0.95rem; color: var(--text-main); width: 100%;
+        }
+
+        /* --- CONTENIDO SCROLLABLE --- */
+        .content-scroll { flex: 1; overflow-y: auto; padding-bottom: 40px; }
+
+        /* --- Global Chart Section --- */
+        .chart-section { padding: 20px 24px 0; }
+        .chart-card {
+            background: var(--surface); border-radius: var(--radius); padding: 16px;
+            box-shadow: var(--shadow); height: 220px; position: relative;
+        }
+        .chart-title { font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 10px; display: flex; justify-content: space-between; }
+
+        /* --- Stats Grid --- */
         .stats-container {
-            padding: 20px 24px;
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            flex-shrink: 0;
+            padding: 20px 24px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
         }
         .stat-card {
             background: var(--surface); padding: 16px 12px; border-radius: var(--radius);
-            box-shadow: var(--shadow); text-align: center; display: flex; flex-direction: column;
-            justify-content: center; align-items: center;
+            box-shadow: var(--shadow); text-align: center;
         }
         .stat-icon {
-            font-size: 1.1rem; margin-bottom: 8px; width: 32px; height: 32px; border-radius: 50%;
+            font-size: 1.1rem; margin: 0 auto 8px; width: 32px; height: 32px; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
         }
-        .stat-value { font-size: 1.2rem; font-weight: 700; color: var(--text-main); line-height: 1.2; }
+        .stat-value { font-size: 1.2rem; font-weight: 700; color: var(--text-main); }
         .stat-label { font-size: 0.7rem; color: var(--text-secondary); font-weight: 500; margin-top: 4px; }
 
-        /* Colores de stats */
+        /* Colores Stats */
         .stat-pub .stat-icon { background: #e3f2fd; color: #007aff; }
+        .stat-study .stat-icon { background: #fff3e0; color: #ff9500; }
         .stat-reg .stat-icon { background: #e8f5e9; color: #34c759; }
-        .stat-aux .stat-icon { background: #fff3e0; color: #ff9500; }
-        .stat-study .stat-icon { background: #f3e5f5; color: #af52de; }
+        .stat-aux .stat-icon { background: #fff3e0; color: #ff9500; } /* Reutilizamos naranja */
 
-        /* --- Lista --- */
-        .list-header { padding: 0 24px 10px; display: flex; justify-content: space-between; align-items: flex-end; }
-        .list-title { font-size: 1.1rem; font-weight: 700; }
-        .live-indicator { 
-            font-size: 0.75rem; color: var(--accent); display: flex; align-items: center; gap: 6px; 
-            background: rgba(0,122,255,0.1); padding: 4px 8px; border-radius: 20px;
-        }
-        .dot { width: 6px; height: 6px; background: currentColor; border-radius: 50%; animation: pulse 2s infinite; }
-
-        .reports-list { flex: 1; overflow-y: auto; padding: 0 24px 40px; display: flex; flex-direction: column; gap: 12px; }
+        /* --- Lista de Reportes --- */
+        .list-header { padding: 10px 24px 10px; font-weight: 700; font-size: 1.1rem; }
+        .reports-list { padding: 0 24px; display: flex; flex-direction: column; gap: 12px; }
         
         .report-item {
             background: var(--surface); border-radius: var(--radius); padding: 16px;
             display: flex; justify-content: space-between; align-items: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.03); animation: slideIn 0.4s ease forwards;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.03); cursor: pointer; transition: transform 0.2s;
         }
+        .report-item:active { transform: scale(0.98); background-color: #fafafa; }
         
         .user-info { display: flex; align-items: center; gap: 12px; }
         .avatar {
@@ -111,38 +126,53 @@
             display: flex; align-items: center; justify-content: center;
             font-weight: 700; font-size: 0.9rem; color: var(--text-main);
         }
-        .name-col h4 { font-size: 0.95rem; margin-bottom: 2px; }
+        .name-col h4 { font-size: 0.95rem; }
         .name-col p { font-size: 0.75rem; color: var(--text-secondary); }
         
-        .data-col { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
+        .data-col { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
         
-        /* Contenedor de métricas en la tarjeta (Horas y Estudios en la misma línea visual o apilados) */
-        .metrics-row {
-            display: flex;
-            align-items: center;
-            gap: 12px; /* Espacio entre estudios y horas */
-            margin-bottom: 4px;
-        }
-
-        .study-badge {
-            font-size: 0.8rem;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            font-weight: 600;
-        }
-        
-        /* Estilos condicionales para estudios */
-        .study-badge.active { color: var(--color-study-active); }
-        .study-badge.empty { color: var(--color-study-empty); font-weight: 500; }
-
+        .metrics-line { display: flex; align-items: center; gap: 8px; }
         .data-hours { font-weight: 700; font-size: 0.95rem; }
-        .data-type { font-size: 0.7rem; color: var(--text-secondary); background: var(--bg); padding: 2px 6px; border-radius: 4px; display: inline-block;}
+        
+        /* ESTILOS PARA ESTUDIOS */
+        .study-indicator { font-size: 0.8rem; display: flex; align-items: center; gap: 4px; transition: color 0.3s; }
+        .study-indicator.active { color: var(--color-study-active); font-weight: 600; }
+        .study-indicator.empty { color: var(--color-study-empty); font-weight: 400; }
 
-        @keyframes floatUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
-        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
-        .empty-state { text-align: center; padding: 40px 0; color: var(--text-secondary); opacity: 0.6; }
+        .data-badge { font-size: 0.7rem; background: var(--bg); padding: 2px 6px; border-radius: 4px; color: var(--text-secondary); display: inline-block; }
+
+        /* --- MODAL DETALLE USUARIO --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 200;
+            display: none; justify-content: center; align-items: flex-end; /* Sheet style */
+        }
+        .modal-sheet {
+            background: var(--surface); width: 100%; max-width: 600px;
+            border-radius: 24px 24px 0 0; padding: 24px;
+            animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            max-height: 90vh; overflow-y: auto;
+        }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+        .sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .sheet-user h2 { font-family: 'Playfair Display', serif; font-size: 1.5rem; }
+        .sheet-user p { color: var(--text-secondary); font-size: 0.9rem; }
+        .btn-close { background: #f2f2f7; border: none; width: 30px; height: 30px; border-radius: 50%; font-size: 1rem; cursor: pointer; }
+
+        /* Grid en Modal (Ahora 2x2) */
+        .sheet-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 24px; }
+        .mini-stat { background: var(--bg); padding: 12px; border-radius: 12px; text-align: center; }
+        .mini-val { font-weight: 700; font-size: 1.1rem; }
+        .mini-lbl { font-size: 0.7rem; color: var(--text-secondary); }
+        
+        /* Diferenciar stats en el modal */
+        .st-hours .mini-val { color: #007aff; }
+        .st-studies .mini-val { color: #ff9500; }
+
+        /* Gráfica Modal */
+        .user-chart-container { height: 250px; width: 100%; margin-bottom: 20px; }
+
     </style>
 </head>
 <body>
@@ -150,7 +180,6 @@
     <div id="login-view">
         <div class="login-card">
             <h1>Admin</h1>
-            <p>Ingrese código de acceso</p>
             <div class="input-wrapper">
                 <input type="password" id="admin-pass" placeholder="••••" maxlength="8">
             </div>
@@ -161,41 +190,96 @@
 
     <div id="dashboard-view">
         <header>
-            <h2>Informe Mensual</h2>
-            <button class="btn-logout" onclick="logout()">Salir</button>
+            <div class="header-top">
+                <h2>Panel de Control</h2>
+                <button class="btn-logout" onclick="logout()">Salir</button>
+            </div>
+            <div class="month-filter-container">
+                <i class="far fa-calendar-alt"></i>
+                <input type="month" id="month-selector" onchange="handleMonthChange()">
+            </div>
         </header>
 
-        <div class="stats-container">
-            <div class="stat-card stat-pub">
-                <div class="stat-icon"><i class="fas fa-users"></i></div>
-                <div class="stat-value" id="stat-total">0</div>
-                <div class="stat-label">Informes</div>
+        <div class="content-scroll">
+            
+            <div class="chart-section">
+                <div class="chart-card">
+                    <div class="chart-title">
+                        <span>Tendencia Semestral</span>
+                        <span style="font-size: 0.7rem; background: #eef; padding: 2px 6px; border-radius:4px; color: var(--accent);">Todos</span>
+                    </div>
+                    <canvas id="globalChart"></canvas>
+                </div>
             </div>
-            <div class="stat-card stat-study">
-                <div class="stat-icon"><i class="fas fa-book-open"></i></div>
-                <div class="stat-value" id="stat-studies">0</div>
-                <div class="stat-label">T. Estudios</div>
+
+            <div class="stats-container">
+                <div class="stat-card stat-pub">
+                    <div class="stat-icon"><i class="fas fa-users"></i></div>
+                    <div class="stat-value" id="stat-total">0</div>
+                    <div class="stat-label">Informes</div>
+                </div>
+                <div class="stat-card stat-study">
+                    <div class="stat-icon"><i class="fas fa-book-open"></i></div>
+                    <div class="stat-value" id="stat-studies">0</div>
+                    <div class="stat-label">Total Estudios</div>
+                </div>
+                
+                <div class="stat-card stat-reg">
+                    <div class="stat-icon"><i class="fas fa-clock"></i></div>
+                    <div class="stat-value" id="stat-avg-reg">0</div>
+                    <div class="stat-label">Prom. Regular</div>
+                </div>
+                <div class="stat-card stat-aux">
+                    <div class="stat-icon"><i class="far fa-clock"></i></div>
+                    <div class="stat-value" id="stat-avg-aux">0</div>
+                    <div class="stat-label">Prom. Auxiliar</div>
+                </div>
             </div>
-            <div class="stat-card stat-reg">
-                <div class="stat-icon"><i class="fas fa-clock"></i></div>
-                <div class="stat-value" id="stat-avg-reg">0</div>
-                <div class="stat-label">Prom. Regular</div>
-            </div>
-            <div class="stat-card stat-aux">
-                <div class="stat-icon"><i class="far fa-clock"></i></div>
-                <div class="stat-value" id="stat-avg-aux">0</div>
-                <div class="stat-label">Prom. Auxiliar</div>
+
+            <div class="list-header">Detalle del Mes</div>
+            <div class="reports-list" id="reports-list">
+                <div style="text-align: center; color: #8e8e93; padding: 20px;">Cargando...</div>
             </div>
         </div>
+    </div>
 
-        <div class="list-header">
-            <span class="list-title">Reportes Recientes</span>
-            <div class="live-indicator"><div class="dot"></div> En vivo</div>
-        </div>
+    <div class="modal-overlay" id="user-modal" onclick="closeUserModal(event)">
+        <div class="modal-sheet" onclick="event.stopPropagation()">
+            <div class="sheet-header">
+                <div class="sheet-user">
+                    <h2 id="modal-name">Nombre</h2>
+                    <p id="modal-type">Tipo de Publicador</p>
+                </div>
+                <button class="btn-close" onclick="closeUserModal()"><i class="fas fa-times"></i></button>
+            </div>
 
-        <div class="reports-list" id="reports-list">
-            <div class="empty-state">
-                <i class="fas fa-spinner fa-spin"></i> Cargando datos...
+            <div class="sheet-stats">
+                <div class="mini-stat st-hours">
+                    <div class="mini-val" id="modal-total-hours">0</div>
+                    <div class="mini-lbl">Horas (6 meses)</div>
+                </div>
+                <div class="mini-stat st-hours">
+                    <div class="mini-val" id="modal-avg-hours">0</div>
+                    <div class="mini-lbl">Prom. Horas</div>
+                </div>
+                <div class="mini-stat st-studies">
+                    <div class="mini-val" id="modal-total-studies">0</div>
+                    <div class="mini-lbl">Estudios (6 meses)</div>
+                </div>
+                <div class="mini-stat st-studies">
+                    <div class="mini-val" id="modal-avg-studies">0</div>
+                    <div class="mini-lbl">Prom. Estudios</div>
+                </div>
+            </div>
+
+            <h4 style="margin-bottom: 15px; font-size: 0.9rem;">Progreso Personal</h4>
+            <div class="user-chart-container">
+                <canvas id="userChart"></canvas>
+            </div>
+            
+            <div style="background: var(--bg); padding: 15px; border-radius: 12px; margin-top: 10px;">
+                <h5 style="margin-bottom: 5px; font-size: 0.85rem;">Última Observación:</h5>
+                <p id="modal-obs" style="font-size: 0.85rem; color: var(--text-secondary); font-style: italic;">Ninguna</p>
             </div>
         </div>
     </div>
@@ -205,9 +289,18 @@
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpdGRpeWF3d3ZtYXR4dWNrYW9iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc1NjIwNTksImV4cCI6MjA4MzEzODA1OX0.kdGxKiQ5INhJAB7ZSwxcy5e8z1XZ73M02IEzHZgEdW0';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-        let allReports = [];
-        const ADMIN_PIN = "admin123"; 
+        let allReports = []; // Todos los datos crudos
+        let globalChartInstance = null;
+        let userChartInstance = null;
 
+        const ADMIN_PIN = "admin123";
+
+        // Configuración Global de Charts
+        Chart.defaults.font.family = "'Inter', sans-serif";
+        Chart.defaults.color = '#8e8e93';
+        Chart.defaults.scale.grid.color = '#f2f2f7';
+
+        // --- LOGIN ---
         function attemptLogin() {
             const input = document.getElementById('admin-pass').value;
             if(input === ADMIN_PIN) {
@@ -217,25 +310,30 @@
             } else {
                 const err = document.getElementById('login-error');
                 err.style.display = 'block';
-                document.getElementById('admin-pass').value = '';
                 setTimeout(() => err.style.display = 'none', 2000);
             }
         }
-
         function logout() { location.reload(); }
 
+        // --- INICIALIZACIÓN ---
         async function initDashboard() {
-            await fetchReports();
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            document.getElementById('month-selector').value = `${year}-${month}`;
+
+            await fetchAllReports();
+            
             supabaseClient
                 .channel('public:informes')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'informes' }, payload => {
                     allReports.unshift(payload.new);
-                    updateUI();
+                    updateDashboard();
                 })
                 .subscribe();
         }
 
-        async function fetchReports() {
+        async function fetchAllReports() {
             try {
                 let { data, error } = await supabaseClient
                     .from('informes')
@@ -244,95 +342,249 @@
 
                 if (error) throw error;
                 allReports = data;
-                updateUI();
+                updateDashboard();
             } catch (err) {
                 console.error(err);
-                document.getElementById('reports-list').innerHTML = '<div class="empty-state">Error al cargar</div>';
+                document.getElementById('reports-list').innerHTML = 'Error de conexión';
             }
         }
 
-        function updateUI() {
-            updateStats();
-            renderList();
+        function updateDashboard() {
+            renderGlobalChart();
+            filterAndRenderList();
         }
 
-        function updateStats() {
-            const total = allReports.length;
-            const totalStudies = allReports.reduce((sum, item) => sum + (item.estudios || 0), 0);
+        function handleMonthChange() {
+            filterAndRenderList(); 
+        }
+
+        // --- LÓGICA DE GRÁFICA GLOBAL ---
+        function renderGlobalChart() {
+            const ctx = document.getElementById('globalChart').getContext('2d');
             
-            // Promedio Regular
-            const regulars = allReports.filter(r => r.tipo === 'Precursor Regular');
+            const months = [];
+            const hoursData = [];
+            const studiesData = [];
+            
+            for (let i = 5; i >= 0; i--) {
+                const d = new Date();
+                d.setMonth(d.getMonth() - i);
+                const monthKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+                const monthLabel = d.toLocaleDateString('es-ES', { month: 'short' });
+                
+                const reportsInMonth = allReports.filter(r => r.created_at.startsWith(monthKey));
+                const sumHours = reportsInMonth.reduce((acc, curr) => acc + (curr.horas || 0), 0);
+                const sumStudies = reportsInMonth.reduce((acc, curr) => acc + (curr.estudios || 0), 0);
+
+                months.push(monthLabel);
+                hoursData.push(sumHours);
+                studiesData.push(sumStudies);
+            }
+
+            if (globalChartInstance) globalChartInstance.destroy();
+
+            globalChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: months,
+                    datasets: [
+                        {
+                            label: 'Horas',
+                            data: hoursData,
+                            borderColor: '#007aff',
+                            backgroundColor: 'rgba(0,122,255,0.1)',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            fill: true,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Estudios',
+                            data: studiesData,
+                            borderColor: '#ff9500',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2,
+                            borderDash: [5, 5],
+                            tension: 0.4,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { grid: { display: false } },
+                        y: { display: false },
+                        y1: { display: false, grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        // --- LÓGICA DE LISTA Y STATS POR MES ---
+        function filterAndRenderList() {
+            const selectedMonth = document.getElementById('month-selector').value; 
+            if(!selectedMonth) return;
+
+            // Filtrar solo los datos del mes seleccionado
+            const monthReports = allReports.filter(item => item.created_at.startsWith(selectedMonth));
+            
+            const totalReports = monthReports.length;
+            const totalStudies = monthReports.reduce((sum, r) => sum + (r.estudios || 0), 0);
+
+            // CÁLCULO DE PROMEDIOS SEPARADOS
+            // 1. Regulares
+            const regulars = monthReports.filter(r => r.tipo === 'Precursor Regular');
             const totalHoursReg = regulars.reduce((sum, item) => sum + (item.horas || 0), 0);
             const avgReg = regulars.length > 0 ? (totalHoursReg / regulars.length).toFixed(1) : 0;
 
-            // Promedio Auxiliar
-            const auxiliars = allReports.filter(r => r.tipo === 'Precursor Auxiliar');
+            // 2. Auxiliares
+            const auxiliars = monthReports.filter(r => r.tipo === 'Precursor Auxiliar');
             const totalHoursAux = auxiliars.reduce((sum, item) => sum + (item.horas || 0), 0);
             const avgAux = auxiliars.length > 0 ? (totalHoursAux / auxiliars.length).toFixed(1) : 0;
 
-            document.getElementById('stat-total').innerText = total;
+            // Actualizar Tarjetas del Dashboard
+            document.getElementById('stat-total').innerText = totalReports;
             document.getElementById('stat-studies').innerText = totalStudies;
             document.getElementById('stat-avg-reg').innerText = avgReg;
             document.getElementById('stat-avg-aux').innerText = avgAux;
-        }
 
-        function renderList() {
-            const listContainer = document.getElementById('reports-list');
-            if (allReports.length === 0) {
-                listContainer.innerHTML = '<div class="empty-state">Aún no hay informes este mes</div>';
+            // Renderizar Lista
+            const listEl = document.getElementById('reports-list');
+            listEl.innerHTML = '';
+
+            if (monthReports.length === 0) {
+                listEl.innerHTML = '<div style="text-align:center; padding:30px; color:#aaa">No hay informes en este mes</div>';
                 return;
             }
-            listContainer.innerHTML = ''; 
-            
-            allReports.forEach(item => {
+
+            monthReports.forEach(item => {
                 const initials = (item.nombre[0] + item.apellido[0]).toUpperCase();
-                let tipoLabel = item.tipo;
-                if(tipoLabel === 'Precursor Regular') tipoLabel = 'Reg';
-                if(tipoLabel === 'Precursor Auxiliar') tipoLabel = 'Aux';
-                if(tipoLabel === 'Publicador') tipoLabel = 'Pub';
-
-                const horasDisplay = item.horas > 0 ? `${item.horas}h` : '<i class="fas fa-check" style="font-size:0.8rem"></i>';
+                let typeShort = item.tipo;
+                if(typeShort === 'Precursor Regular') typeShort = 'Regular';
+                if(typeShort === 'Precursor Auxiliar') typeShort = 'Auxiliar';
                 
-                // LÓGICA DE ESTUDIOS (NUEVA)
-                const estudiosCount = item.estudios || 0;
-                // Si tiene estudios > 0 usa clase 'active' (naranja), si no 'empty' (gris)
-                const studyClass = estudiosCount > 0 ? 'active' : 'empty';
+                const hoursDisplay = (item.horas > 0) ? `${item.horas}h` : '<i class="fas fa-check"></i>';
+                
+                const estudios = item.estudios || 0;
+                const studyClass = estudios > 0 ? 'active' : 'empty';
+                const studyIcon = estudios > 0 ? '<i class="fas fa-book-open"></i>' : '';
 
-                const card = document.createElement('div');
-                card.className = 'report-item';
-                card.innerHTML = `
+                const div = document.createElement('div');
+                div.className = 'report-item';
+                div.onclick = () => openUserModal(item.nombre, item.apellido, item.tipo, item.observaciones);
+                div.innerHTML = `
                     <div class="user-info">
                         <div class="avatar">${initials}</div>
                         <div class="name-col">
                             <h4>${item.nombre} ${item.apellido}</h4>
-                            <p>${formatDate(item.created_at)}</p>
+                            <p>${new Date(item.created_at).toLocaleDateString()}</p>
                         </div>
                     </div>
                     <div class="data-col">
-                        <div class="metrics-row">
-                            <div class="study-badge ${studyClass}" title="Estudios Bíblicos">
-                                <i class="fas fa-book-open"></i> ${estudiosCount}
-                            </div>
-                            <div class="data-hours">${horasDisplay}</div>
+                        <div class="metrics-line">
+                            <span class="study-indicator ${studyClass}">
+                                ${studyIcon} ${estudios} est.
+                            </span>
+                            <div class="data-hours">${hoursDisplay}</div>
                         </div>
-                        <div class="data-type">${tipoLabel}</div>
+                        <span class="data-badge">${typeShort}</span>
                     </div>
                 `;
-                listContainer.appendChild(card);
+                listEl.appendChild(div);
             });
         }
 
-        function formatDate(dateString) {
-            const date = new Date(dateString);
-            const now = new Date();
-            const diffMs = now - date;
-            const diffMins = Math.floor(diffMs / 60000);
-            const diffHours = Math.floor(diffMins / 60);
+        // --- MODAL Y GRÁFICA INDIVIDUAL ---
+        function openUserModal(nombre, apellido, tipo, observaciones) {
+            const modal = document.getElementById('user-modal');
+            modal.style.display = 'flex';
             
-            if (diffMins < 1) return 'Justo ahora';
-            if (diffMins < 60) return `Hace ${diffMins} min`;
-            if (diffHours < 24) return `Hace ${diffHours} h`;
-            return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+            document.getElementById('modal-name').innerText = `${nombre} ${apellido}`;
+            document.getElementById('modal-type').innerText = tipo;
+            document.getElementById('modal-obs').innerText = observaciones || "Sin observaciones recientes.";
+
+            // Filtrar HISTORIAL COMPLETO
+            const userHistory = allReports.filter(r => 
+                r.nombre.toLowerCase() === nombre.toLowerCase() && 
+                r.apellido.toLowerCase() === apellido.toLowerCase()
+            ).sort((a,b) => new Date(a.created_at) - new Date(b.created_at)); 
+
+            // Datos para gráfica (Últimos 6 meses)
+            const historySlice = userHistory.slice(-6); 
+            
+            const labels = historySlice.map(r => {
+                const d = new Date(r.created_at);
+                return d.toLocaleDateString('es-ES', { month: 'short' });
+            });
+            const dataHours = historySlice.map(r => r.horas || 0);
+            const dataStudies = historySlice.map(r => r.estudios || 0);
+
+            // CÁLCULOS ESTADÍSTICOS PERSONALES (De todo el historial disponible)
+            const count = userHistory.length;
+            
+            // Horas
+            const sumUserHours = userHistory.reduce((a,b) => a + (b.horas||0), 0);
+            const avgUserHours = count ? (sumUserHours / count).toFixed(1) : 0;
+            
+            // Estudios
+            const sumUserStudies = userHistory.reduce((a,b) => a + (b.estudios||0), 0);
+            const avgUserStudies = count ? (sumUserStudies / count).toFixed(1) : 0;
+            
+            // Pintar en el Grid
+            document.getElementById('modal-total-hours').innerText = sumUserHours;
+            document.getElementById('modal-avg-hours').innerText = avgUserHours;
+            document.getElementById('modal-total-studies').innerText = sumUserStudies;
+            document.getElementById('modal-avg-studies').innerText = avgUserStudies;
+
+            // Renderizar Gráfica
+            const ctx = document.getElementById('userChart').getContext('2d');
+            if (userChartInstance) userChartInstance.destroy();
+
+            userChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Horas',
+                            data: dataHours,
+                            backgroundColor: '#007aff',
+                            borderRadius: 6,
+                            barPercentage: 0.6,
+                            order: 2
+                        },
+                        {
+                            label: 'Estudios',
+                            type: 'line',
+                            data: dataStudies,
+                            borderColor: '#ff9500',
+                            borderWidth: 2,
+                            tension: 0.3,
+                            yAxisID: 'y1',
+                            order: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, grid: { borderDash: [4, 4] } },
+                        y1: { display: false, position: 'right', beginAtZero: true, max: Math.max(...dataStudies) + 2 }, // Escala ajustada para estudios
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        }
+
+        function closeUserModal(e) {
+            if (e && e.target !== document.getElementById('user-modal')) return;
+            document.getElementById('user-modal').style.display = 'none';
         }
 
         document.getElementById('admin-pass').addEventListener('keypress', function (e) {
