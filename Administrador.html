@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Panel Administrador</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <style>
+        /* --- Reset & Variables --- */
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
+        :root {
+            --bg: #f2f2f7;
+            --surface: #ffffff;
+            --primary: #000000;
+            --text-main: #1c1c1e;
+            --text-secondary: #8e8e93;
+            --border: #e5e5ea;
+            --accent: #007aff;
+            --radius: 16px;
+            --shadow: 0 4px 20px rgba(0,0,0,0.05);
+        }
+        body {
+            font-family: 'Inter', sans-serif; background-color: var(--bg); color: var(--text-main);
+            height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+        }
+
+        /* --- LOGIN SCREEN --- */
+        #login-view {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg);
+            z-index: 100; display: flex; align-items: center; justify-content: center; padding: 24px;
+        }
+        .login-card {
+            background: var(--surface); padding: 40px 30px; border-radius: 24px; width: 100%; max-width: 360px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.1); text-align: center; animation: floatUp 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        .login-card h1 { font-family: 'Playfair Display', serif; font-size: 1.8rem; margin-bottom: 8px; }
+        .login-card p { color: var(--text-secondary); margin-bottom: 30px; font-size: 0.9rem; }
+        .input-wrapper { position: relative; margin-bottom: 20px; }
+        input[type="password"] {
+            width: 100%; padding: 16px; border-radius: 12px; border: 1px solid var(--border);
+            background: var(--bg); font-size: 1rem; text-align: center; letter-spacing: 4px; transition: all 0.3s;
+        }
+        input:focus { border-color: var(--primary); background: var(--surface); }
+        .btn-login {
+            width: 100%; padding: 16px; background: var(--primary); color: white; border: none;
+            border-radius: 12px; font-weight: 600; font-size: 1rem; cursor: pointer;
+        }
+
+        /* --- DASHBOARD --- */
+        #dashboard-view { display: none; height: 100%; flex-direction: column; }
+        header {
+            background: rgba(255,255,255,0.85); backdrop-filter: blur(20px); padding: 20px 24px;
+            padding-top: max(20px, env(safe-area-inset-top)); border-bottom: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center; z-index: 10;
+        }
+        header h2 { font-family: 'Playfair Display', serif; font-size: 1.5rem; }
+        .btn-logout { background: transparent; border: none; color: var(--text-secondary); font-size: 0.9rem; font-weight: 500; cursor: pointer; }
+
+        /* --- Stats Cards (Grid 2x2 para acomodar 4 tarjetas) --- */
+        .stats-container {
+            padding: 20px 24px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr); /* 2 columnas */
+            gap: 12px;
+            flex-shrink: 0;
+        }
+        .stat-card {
+            background: var(--surface); padding: 16px 12px; border-radius: var(--radius);
+            box-shadow: var(--shadow); text-align: center; display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+        }
+        .stat-icon {
+            font-size: 1.1rem; margin-bottom: 8px; width: 32px; height: 32px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .stat-value { font-size: 1.2rem; font-weight: 700; color: var(--text-main); line-height: 1.2; }
+        .stat-label { font-size: 0.7rem; color: var(--text-secondary); font-weight: 500; margin-top: 4px; }
+
+        /* Colores de stats */
+        .stat-pub .stat-icon { background: #e3f2fd; color: #007aff; }
+        .stat-reg .stat-icon { background: #e8f5e9; color: #34c759; }
+        .stat-aux .stat-icon { background: #fff3e0; color: #ff9500; }
+        .stat-study .stat-icon { background: #f3e5f5; color: #af52de; }
+
+        /* --- Lista --- */
+        .list-header { padding: 0 24px 10px; display: flex; justify-content: space-between; align-items: flex-end; }
+        .list-title { font-size: 1.1rem; font-weight: 700; }
+        .live-indicator { 
+            font-size: 0.75rem; color: var(--accent); display: flex; align-items: center; gap: 6px; 
+            background: rgba(0,122,255,0.1); padding: 4px 8px; border-radius: 20px;
+        }
+        .dot { width: 6px; height: 6px; background: currentColor; border-radius: 50%; animation: pulse 2s infinite; }
+
+        .reports-list { flex: 1; overflow-y: auto; padding: 0 24px 40px; display: flex; flex-direction: column; gap: 12px; }
+        .report-item {
+            background: var(--surface); border-radius: var(--radius); padding: 16px;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.03); animation: slideIn 0.4s ease forwards;
+        }
+        .user-info { display: flex; align-items: center; gap: 12px; }
+        .avatar {
+            width: 40px; height: 40px; background: var(--bg); border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 0.9rem; color: var(--text-main);
+        }
+        .name-col h4 { font-size: 0.95rem; margin-bottom: 2px; }
+        .name-col p { font-size: 0.75rem; color: var(--text-secondary); }
+        .data-col { text-align: right; }
+        .data-hours { font-weight: 700; font-size: 0.95rem; }
+        .data-type { font-size: 0.7rem; color: var(--text-secondary); background: var(--bg); padding: 2px 6px; border-radius: 4px; margin-top: 4px; display: inline-block;}
+
+        @keyframes floatUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+        .empty-state { text-align: center; padding: 40px 0; color: var(--text-secondary); opacity: 0.6; }
+    </style>
+</head>
+<body>
+
+    <div id="login-view">
+        <div class="login-card">
+            <h1>Admin</h1>
+            <p>Ingrese código de acceso</p>
+            <div class="input-wrapper">
+                <input type="password" id="admin-pass" placeholder="••••" maxlength="8">
+            </div>
+            <button class="btn-login" onclick="attemptLogin()">Entrar</button>
+            <p id="login-error" style="color: #ff3b30; font-size: 0.8rem; margin-top: 10px; display: none;">Código incorrecto</p>
+        </div>
+    </div>
+
+    <div id="dashboard-view">
+        <header>
+            <h2>Informe Mensual</h2>
+            <button class="btn-logout" onclick="logout()">Salir</button>
+        </header>
+
+        <div class="stats-container">
+            <div class="stat-card stat-pub">
+                <div class="stat-icon"><i class="fas fa-users"></i></div>
+                <div class="stat-value" id="stat-total">0</div>
+                <div class="stat-label">Total Informes</div>
+            </div>
+            <div class="stat-card stat-study">
+                <div class="stat-icon"><i class="fas fa-book-open"></i></div>
+                <div class="stat-value" id="stat-studies">0</div>
+                <div class="stat-label">T. Estudios</div>
+            </div>
+            <div class="stat-card stat-reg">
+                <div class="stat-icon"><i class="fas fa-clock"></i></div>
+                <div class="stat-value" id="stat-avg-reg">0</div>
+                <div class="stat-label">Prom. Regular</div>
+            </div>
+            <div class="stat-card stat-aux">
+                <div class="stat-icon"><i class="far fa-clock"></i></div>
+                <div class="stat-value" id="stat-avg-aux">0</div>
+                <div class="stat-label">Prom. Auxiliar</div>
+            </div>
+        </div>
+
+        <div class="list-header">
+            <span class="list-title">Reportes Recientes</span>
+            <div class="live-indicator"><div class="dot"></div> En vivo</div>
+        </div>
+
+        <div class="reports-list" id="reports-list">
+            <div class="empty-state">
+                <i class="fas fa-spinner fa-spin"></i> Cargando datos...
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://bitdiyawwvmatxuckaob.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpdGRpeWF3d3ZtYXR4dWNrYW9iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc1NjIwNTksImV4cCI6MjA4MzEzODA1OX0.kdGxKiQ5INhJAB7ZSwxcy5e8z1XZ73M02IEzHZgEdW0';
+        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let allReports = [];
+        const ADMIN_PIN = "admin123"; 
+
+        function attemptLogin() {
+            const input = document.getElementById('admin-pass').value;
+            if(input === ADMIN_PIN) {
+                document.getElementById('login-view').style.display = 'none';
+                document.getElementById('dashboard-view').style.display = 'flex';
+                initDashboard();
+            } else {
+                const err = document.getElementById('login-error');
+                err.style.display = 'block';
+                document.getElementById('admin-pass').value = '';
+                setTimeout(() => err.style.display = 'none', 2000);
+            }
+        }
+
+        function logout() { location.reload(); }
+
+        async function initDashboard() {
+            await fetchReports();
+            supabaseClient
+                .channel('public:informes')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'informes' }, payload => {
+                    allReports.unshift(payload.new);
+                    updateUI();
+                })
+                .subscribe();
+        }
+
+        async function fetchReports() {
+            try {
+                let { data, error } = await supabaseClient
+                    .from('informes')
+                    .select('*')
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+                allReports = data;
+                updateUI();
+            } catch (err) {
+                console.error(err);
+                document.getElementById('reports-list').innerHTML = '<div class="empty-state">Error al cargar</div>';
+            }
+        }
+
+        function updateUI() {
+            updateStats();
+            renderList();
+        }
+
+        function updateStats() {
+            // 1. Total y Estudios
+            const total = allReports.length;
+            const totalStudies = allReports.reduce((sum, item) => sum + (item.estudios || 0), 0);
+
+            // 2. Calcular promedio Regular
+            const regulars = allReports.filter(r => r.tipo === 'Precursor Regular');
+            const totalHoursReg = regulars.reduce((sum, item) => sum + (item.horas || 0), 0);
+            const avgReg = regulars.length > 0 ? (totalHoursReg / regulars.length).toFixed(1) : 0;
+
+            // 3. Calcular promedio Auxiliar
+            const auxiliars = allReports.filter(r => r.tipo === 'Precursor Auxiliar');
+            const totalHoursAux = auxiliars.reduce((sum, item) => sum + (item.horas || 0), 0);
+            const avgAux = auxiliars.length > 0 ? (totalHoursAux / auxiliars.length).toFixed(1) : 0;
+
+            // Renderizar
+            document.getElementById('stat-total').innerText = total;
+            document.getElementById('stat-studies').innerText = totalStudies;
+            document.getElementById('stat-avg-reg').innerText = avgReg;
+            document.getElementById('stat-avg-aux').innerText = avgAux;
+        }
+
+        function renderList() {
+            const listContainer = document.getElementById('reports-list');
+            if (allReports.length === 0) {
+                listContainer.innerHTML = '<div class="empty-state">Aún no hay informes este mes</div>';
+                return;
+            }
+            listContainer.innerHTML = ''; 
+            allReports.forEach(item => {
+                const initials = (item.nombre[0] + item.apellido[0]).toUpperCase();
+                let tipoLabel = item.tipo;
+                if(tipoLabel === 'Precursor Regular') tipoLabel = 'Reg';
+                if(tipoLabel === 'Precursor Auxiliar') tipoLabel = 'Aux';
+                if(tipoLabel === 'Publicador') tipoLabel = 'Pub';
+
+                // Mostrar horas solo si aplica (o un check si es publicador sin horas)
+                const horasDisplay = item.horas > 0 ? `${item.horas}h` : '<i class="fas fa-check" style="font-size:0.8rem"></i>';
+
+                const card = document.createElement('div');
+                card.className = 'report-item';
+                card.innerHTML = `
+                    <div class="user-info">
+                        <div class="avatar">${initials}</div>
+                        <div class="name-col">
+                            <h4>${item.nombre} ${item.apellido}</h4>
+                            <p>${formatDate(item.created_at)}</p>
+                        </div>
+                    </div>
+                    <div class="data-col">
+                        <div class="data-hours">${horasDisplay}</div>
+                        <div class="data-type">${tipoLabel}</div>
+                    </div>
+                `;
+                listContainer.appendChild(card);
+            });
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMins / 60);
+            
+            if (diffMins < 1) return 'Justo ahora';
+            if (diffMins < 60) return `Hace ${diffMins} min`;
+            if (diffHours < 24) return `Hace ${diffHours} h`;
+            return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
+        }
+
+        document.getElementById('admin-pass').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') attemptLogin();
+        });
+    </script>
+</body>
+</html>
