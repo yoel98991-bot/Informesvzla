@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -20,6 +21,9 @@
             --accent: #007aff;
             --radius: 16px;
             --shadow: 0 4px 20px rgba(0,0,0,0.05);
+            /* Colores específicos para indicadores */
+            --color-study-active: #ff9500;
+            --color-study-empty: #d1d1d6;
         }
         body {
             font-family: 'Inter', sans-serif; background-color: var(--bg); color: var(--text-main);
@@ -58,11 +62,11 @@
         header h2 { font-family: 'Playfair Display', serif; font-size: 1.5rem; }
         .btn-logout { background: transparent; border: none; color: var(--text-secondary); font-size: 0.9rem; font-weight: 500; cursor: pointer; }
 
-        /* --- Stats Cards (Grid 2x2 para acomodar 4 tarjetas) --- */
+        /* --- Stats Cards (Grid 2x2) --- */
         .stats-container {
             padding: 20px 24px;
             display: grid;
-            grid-template-columns: repeat(2, 1fr); /* 2 columnas */
+            grid-template-columns: repeat(2, 1fr);
             gap: 12px;
             flex-shrink: 0;
         }
@@ -94,11 +98,13 @@
         .dot { width: 6px; height: 6px; background: currentColor; border-radius: 50%; animation: pulse 2s infinite; }
 
         .reports-list { flex: 1; overflow-y: auto; padding: 0 24px 40px; display: flex; flex-direction: column; gap: 12px; }
+        
         .report-item {
             background: var(--surface); border-radius: var(--radius); padding: 16px;
             display: flex; justify-content: space-between; align-items: center;
             box-shadow: 0 2px 10px rgba(0,0,0,0.03); animation: slideIn 0.4s ease forwards;
         }
+        
         .user-info { display: flex; align-items: center; gap: 12px; }
         .avatar {
             width: 40px; height: 40px; background: var(--bg); border-radius: 50%;
@@ -107,9 +113,31 @@
         }
         .name-col h4 { font-size: 0.95rem; margin-bottom: 2px; }
         .name-col p { font-size: 0.75rem; color: var(--text-secondary); }
-        .data-col { text-align: right; }
+        
+        .data-col { text-align: right; display: flex; flex-direction: column; align-items: flex-end; }
+        
+        /* Contenedor de métricas en la tarjeta (Horas y Estudios en la misma línea visual o apilados) */
+        .metrics-row {
+            display: flex;
+            align-items: center;
+            gap: 12px; /* Espacio entre estudios y horas */
+            margin-bottom: 4px;
+        }
+
+        .study-badge {
+            font-size: 0.8rem;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: 600;
+        }
+        
+        /* Estilos condicionales para estudios */
+        .study-badge.active { color: var(--color-study-active); }
+        .study-badge.empty { color: var(--color-study-empty); font-weight: 500; }
+
         .data-hours { font-weight: 700; font-size: 0.95rem; }
-        .data-type { font-size: 0.7rem; color: var(--text-secondary); background: var(--bg); padding: 2px 6px; border-radius: 4px; margin-top: 4px; display: inline-block;}
+        .data-type { font-size: 0.7rem; color: var(--text-secondary); background: var(--bg); padding: 2px 6px; border-radius: 4px; display: inline-block;}
 
         @keyframes floatUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes slideIn { from { opacity: 0; transform: translateX(-10px); } to { opacity: 1; transform: translateX(0); } }
@@ -141,7 +169,7 @@
             <div class="stat-card stat-pub">
                 <div class="stat-icon"><i class="fas fa-users"></i></div>
                 <div class="stat-value" id="stat-total">0</div>
-                <div class="stat-label">Total Informes</div>
+                <div class="stat-label">Informes</div>
             </div>
             <div class="stat-card stat-study">
                 <div class="stat-icon"><i class="fas fa-book-open"></i></div>
@@ -229,21 +257,19 @@
         }
 
         function updateStats() {
-            // 1. Total y Estudios
             const total = allReports.length;
             const totalStudies = allReports.reduce((sum, item) => sum + (item.estudios || 0), 0);
-
-            // 2. Calcular promedio Regular
+            
+            // Promedio Regular
             const regulars = allReports.filter(r => r.tipo === 'Precursor Regular');
             const totalHoursReg = regulars.reduce((sum, item) => sum + (item.horas || 0), 0);
             const avgReg = regulars.length > 0 ? (totalHoursReg / regulars.length).toFixed(1) : 0;
 
-            // 3. Calcular promedio Auxiliar
+            // Promedio Auxiliar
             const auxiliars = allReports.filter(r => r.tipo === 'Precursor Auxiliar');
             const totalHoursAux = auxiliars.reduce((sum, item) => sum + (item.horas || 0), 0);
             const avgAux = auxiliars.length > 0 ? (totalHoursAux / auxiliars.length).toFixed(1) : 0;
 
-            // Renderizar
             document.getElementById('stat-total').innerText = total;
             document.getElementById('stat-studies').innerText = totalStudies;
             document.getElementById('stat-avg-reg').innerText = avgReg;
@@ -257,6 +283,7 @@
                 return;
             }
             listContainer.innerHTML = ''; 
+            
             allReports.forEach(item => {
                 const initials = (item.nombre[0] + item.apellido[0]).toUpperCase();
                 let tipoLabel = item.tipo;
@@ -264,8 +291,12 @@
                 if(tipoLabel === 'Precursor Auxiliar') tipoLabel = 'Aux';
                 if(tipoLabel === 'Publicador') tipoLabel = 'Pub';
 
-                // Mostrar horas solo si aplica (o un check si es publicador sin horas)
                 const horasDisplay = item.horas > 0 ? `${item.horas}h` : '<i class="fas fa-check" style="font-size:0.8rem"></i>';
+                
+                // LÓGICA DE ESTUDIOS (NUEVA)
+                const estudiosCount = item.estudios || 0;
+                // Si tiene estudios > 0 usa clase 'active' (naranja), si no 'empty' (gris)
+                const studyClass = estudiosCount > 0 ? 'active' : 'empty';
 
                 const card = document.createElement('div');
                 card.className = 'report-item';
@@ -278,7 +309,12 @@
                         </div>
                     </div>
                     <div class="data-col">
-                        <div class="data-hours">${horasDisplay}</div>
+                        <div class="metrics-row">
+                            <div class="study-badge ${studyClass}" title="Estudios Bíblicos">
+                                <i class="fas fa-book-open"></i> ${estudiosCount}
+                            </div>
+                            <div class="data-hours">${horasDisplay}</div>
+                        </div>
                         <div class="data-type">${tipoLabel}</div>
                     </div>
                 `;
