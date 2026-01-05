@@ -4,592 +4,646 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Panel Administrador - Estadísticas</title>
+    <title>Panel Admin | Directiva</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     
     <style>
-        /* --- Reset & Variables --- */
-        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; }
+        /* --- VARIABLES & RESET (TEMA ELEGANCE B/W) --- */
         :root {
-            --bg: #f2f2f7;
-            --surface: #ffffff;
-            --primary: #000000;
-            --text-main: #1c1c1e;
-            --text-secondary: #8e8e93;
-            --border: #e5e5ea;
-            --accent: #007aff;
-            --radius: 16px;
-            --shadow: 0 4px 20px rgba(0,0,0,0.05);
+            --bg-app: #F5F5F5;      
+            --surface: #FFFFFF;     
+            --primary: #000000;     
+            --primary-fade: rgba(0, 0, 0, 0.05);
             
-            /* Colores específicos */
-            --color-study-active: #ff9500; 
-            --color-study-empty: #d1d1d6;  
+            /* Colores funcionales */
+            --accent-blue: #007AFF; 
+            --accent-indigo: #5856D6; 
+            --success: #10B981;     
+            --warning: #F59E0B;     
+            
+            --text-main: #111111;
+            --text-sec: #666666;
+            --border: #E0E0E0;
+            
+            --radius-card: 16px;
+            --radius-btn: 8px;      
+            
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.04);
+            
+            --header-h: 60px;
+            --tab-h: 70px;
         }
+        
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; outline: none; font-family: 'DM Sans', 'Inter', sans-serif; }
+        
         body {
-            font-family: 'Inter', sans-serif; background-color: var(--bg); color: var(--text-main);
-            height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+            background-color: var(--bg-app); color: var(--text-main);
+            height: 100vh; height: 100dvh; overflow: hidden; display: flex; flex-direction: column;
         }
 
-        /* --- LOGIN SCREEN --- */
+        /* --- LOGIN (Minimalista & Serio) --- */
         #login-view {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg);
-            z-index: 100; display: flex; align-items: center; justify-content: center; padding: 24px;
+            position: fixed; inset: 0; background: #FFFFFF; z-index: 1000;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px;
         }
-        .login-card {
-            background: var(--surface); padding: 40px 30px; border-radius: 24px; width: 100%; max-width: 360px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.1); text-align: center;
+        .login-content {
+            width: 100%; max-width: 320px; text-align: center;
+            animation: fadeIn 0.8s ease;
         }
-        .login-card h1 { font-family: 'Playfair Display', serif; font-size: 1.8rem; margin-bottom: 8px; }
-        .input-wrapper { margin-bottom: 20px; margin-top: 20px;}
-        input[type="password"] {
-            width: 100%; padding: 16px; border-radius: 12px; border: 1px solid var(--border);
-            background: var(--bg); font-size: 1rem; text-align: center; letter-spacing: 4px;
+        .logo-area {
+            width: 60px; height: 60px; background: var(--primary); color: white;
+            border-radius: 12px; display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem; margin: 0 auto 30px; box-shadow: 0 10px 20px rgba(0,0,0,0.2);
         }
-        .btn-login {
+        .login-title { font-size: 1.4rem; font-weight: 700; color: var(--text-main); margin-bottom: 8px; letter-spacing: -0.5px; }
+        .login-sub { font-size: 0.9rem; color: var(--text-sec); margin-bottom: 40px; }
+        
+        .pin-input {
+            width: 100%; padding: 16px; border-radius: var(--radius-btn); 
+            border: 1px solid var(--border); background: #FAFAFA; 
+            font-size: 1.1rem; text-align: center; letter-spacing: 4px; margin-bottom: 20px;
+            transition: all 0.2s; color: var(--primary);
+        }
+        .pin-input:focus { border-color: var(--primary); background: #fff; }
+        
+        .btn-primary {
             width: 100%; padding: 16px; background: var(--primary); color: white; border: none;
-            border-radius: 12px; font-weight: 600; cursor: pointer;
+            border-radius: var(--radius-btn); font-weight: 500; font-size: 0.95rem; cursor: pointer;
+            transition: transform 0.1s, opacity 0.2s; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
         }
+        .btn-primary:active { transform: scale(0.98); }
 
-        /* --- DASHBOARD HEADER --- */
-        #dashboard-view { display: none; height: 100%; flex-direction: column; }
+        /* --- LAYOUT PRINCIPAL --- */
+        #app-view { display: none; height: 100%; flex-direction: column; }
         
-        header {
-            background: rgba(255,255,255,0.9); backdrop-filter: blur(20px); 
-            padding: 16px 24px; padding-top: max(16px, env(safe-area-inset-top));
-            border-bottom: 1px solid var(--border); z-index: 10;
-        }
-        
-        .header-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-        header h2 { font-family: 'Playfair Display', serif; font-size: 1.5rem; }
-        .btn-logout { background: transparent; border: none; color: var(--text-secondary); cursor: pointer; }
-
-        /* Filtro de Mes */
-        .month-filter-container {
-            display: flex; align-items: center; gap: 10px; background: var(--bg);
-            padding: 8px 12px; border-radius: 12px;
-        }
-        .month-filter-container i { color: var(--text-secondary); }
-        input[type="month"] {
-            border: none; background: transparent; font-family: 'Inter', sans-serif;
-            font-size: 0.95rem; color: var(--text-main); width: 100%;
-        }
-
-        /* --- CONTENIDO SCROLLABLE --- */
-        .content-scroll { flex: 1; overflow-y: auto; padding-bottom: 40px; }
-
-        /* --- Global Chart Section --- */
-        .chart-section { padding: 20px 24px 0; }
-        .chart-card {
-            background: var(--surface); border-radius: var(--radius); padding: 16px;
-            box-shadow: var(--shadow); height: 220px; position: relative;
-        }
-        .chart-title { font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); margin-bottom: 10px; display: flex; justify-content: space-between; }
-
-        /* --- Stats Grid --- */
-        .stats-container {
-            padding: 20px 24px; display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px;
-        }
-        .stat-card {
-            background: var(--surface); padding: 16px 12px; border-radius: var(--radius);
-            box-shadow: var(--shadow); text-align: center;
-        }
-        .stat-icon {
-            font-size: 1.1rem; margin: 0 auto 8px; width: 32px; height: 32px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-        }
-        .stat-value { font-size: 1.2rem; font-weight: 700; color: var(--text-main); }
-        .stat-label { font-size: 0.7rem; color: var(--text-secondary); font-weight: 500; margin-top: 4px; }
-
-        /* Colores Stats */
-        .stat-pub .stat-icon { background: #e3f2fd; color: #007aff; }
-        .stat-study .stat-icon { background: #fff3e0; color: #ff9500; }
-        .stat-reg .stat-icon { background: #e8f5e9; color: #34c759; }
-        .stat-aux .stat-icon { background: #fff3e0; color: #ff9500; } /* Reutilizamos naranja */
-
-        /* --- Lista de Reportes --- */
-        .list-header { padding: 10px 24px 10px; font-weight: 700; font-size: 1.1rem; }
-        .reports-list { padding: 0 24px; display: flex; flex-direction: column; gap: 12px; }
-        
-        .report-item {
-            background: var(--surface); border-radius: var(--radius); padding: 16px;
+        .top-nav {
+            background: rgba(255,255,255,0.9); backdrop-filter: blur(10px);
+            padding: 12px 24px; padding-top: max(12px, env(safe-area-inset-top));
+            border-bottom: 1px solid var(--border); z-index: 100;
             display: flex; justify-content: space-between; align-items: center;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.03); cursor: pointer; transition: transform 0.2s;
+            height: calc(var(--header-h) + env(safe-area-inset-top));
         }
-        .report-item:active { transform: scale(0.98); background-color: #fafafa; }
-        
-        .user-info { display: flex; align-items: center; gap: 12px; }
-        .avatar {
-            width: 40px; height: 40px; background: var(--bg); border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-weight: 700; font-size: 0.9rem; color: var(--text-main);
+        .nav-title { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.3px; }
+        .month-picker {
+            background: #F0F0F0; border-radius: 6px; padding: 6px 12px;
+            display: flex; align-items: center; gap: 8px; font-size: 0.85rem; font-weight: 500; cursor: pointer;
+            color: var(--text-main);
         }
-        .name-col h4 { font-size: 0.95rem; }
-        .name-col p { font-size: 0.75rem; color: var(--text-secondary); }
-        
-        .data-col { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
-        
-        .metrics-line { display: flex; align-items: center; gap: 8px; }
-        .data-hours { font-weight: 700; font-size: 0.95rem; }
-        
-        /* ESTILOS PARA ESTUDIOS */
-        .study-indicator { font-size: 0.8rem; display: flex; align-items: center; gap: 4px; transition: color 0.3s; }
-        .study-indicator.active { color: var(--color-study-active); font-weight: 600; }
-        .study-indicator.empty { color: var(--color-study-empty); font-weight: 400; }
+        .month-picker input { border: none; background: transparent; font-weight: 500; width: 100px; color: var(--text-main); font-family: inherit; }
 
-        .data-badge { font-size: 0.7rem; background: var(--bg); padding: 2px 6px; border-radius: 4px; color: var(--text-secondary); display: inline-block; }
+        .main-content { flex: 1; overflow-y: auto; position: relative; scroll-behavior: smooth; }
+        .page-section { display: none; padding: 24px; padding-bottom: 100px; animation: fadeIn 0.3s ease; }
+        .page-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-        /* --- MODAL DETALLE USUARIO --- */
+        /* --- COMPONENTES UI --- */
+        .card { background: var(--surface); border-radius: var(--radius-card); padding: 24px; box-shadow: var(--shadow-sm); margin-bottom: 24px; border: 1px solid rgba(0,0,0,0.03); }
+        .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .card-title { font-size: 0.9rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-sec); }
+        
+        .segmented-control { display: flex; background: #F0F0F0; padding: 3px; border-radius: 8px; width: 100%; margin-bottom: 20px; }
+        .segment-btn { flex: 1; border: none; background: transparent; padding: 8px; font-size: 0.8rem; font-weight: 500; border-radius: 6px; color: var(--text-sec); cursor: pointer; transition: all 0.2s; }
+        .segment-btn.active { background: var(--primary); color: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+        .stat-box { 
+            background: var(--surface); padding: 16px; border-radius: var(--radius-card); 
+            box-shadow: var(--shadow-sm); display: flex; flex-direction: column; justify-content: space-between; height: 110px;
+            border: 1px solid rgba(0,0,0,0.03);
+        }
+        .stat-box-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1rem; margin-bottom: 8px; }
+        .stat-box-val { font-size: 1.6rem; font-weight: 700; letter-spacing: -1px; line-height: 1; color: var(--text-main); }
+        .stat-box-lbl { font-size: 0.75rem; color: var(--text-sec); font-weight: 500; margin-top: 4px; }
+
+        .search-bar { position: sticky; top: 0; background: var(--bg-app); z-index: 10; padding-bottom: 20px; margin-top: -5px; }
+        .search-input-wrapper { position: relative; }
+        .search-input-wrapper i { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-sec); font-size: 0.9rem; }
+        .search-input { width: 100%; padding: 14px 14px 14px 44px; border-radius: 12px; border: 1px solid transparent; background: #FFFFFF; font-size: 0.95rem; color: var(--text-main); box-shadow: var(--shadow-sm); }
+        .search-input:focus { border-color: var(--primary); }
+
+        .pub-list { display: flex; flex-direction: column; gap: 12px; }
+        .pub-item {
+            background: var(--surface); padding: 16px 20px; border-radius: 12px; display: flex; align-items: center;
+            justify-content: space-between; transition: transform 0.2s; cursor: pointer;
+            border: 1px solid rgba(0,0,0,0.03); box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        }
+        .pub-item:active { transform: scale(0.99); background: #FAFAFA; }
+        .pub-avatar {
+            width: 40px; height: 40px; border-radius: 50%; background: #F0F0F0; border: 1px solid #E5E5E5;
+            color: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 700; margin-right: 16px; font-size: 0.85rem;
+        }
+        .pub-info h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 3px; color: var(--text-main); }
+        .pub-info p { font-size: 0.75rem; color: var(--text-sec); font-weight: 500; }
+        .pub-metrics { text-align: right; display: flex; flex-direction: column; align-items: flex-end; justify-content: center; }
+        
+        .badge { font-size: 0.65rem; padding: 3px 8px; border-radius: 4px; font-weight: 600; display: inline-block; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid transparent; }
+        .badge-reg { color: var(--success); border-color: rgba(16, 185, 129, 0.2); background: rgba(16, 185, 129, 0.05); }
+        .badge-aux { color: var(--warning); border-color: rgba(245, 158, 11, 0.2); background: rgba(245, 158, 11, 0.05); }
+        .badge-pub { color: var(--text-sec); border-color: #E5E5E5; background: #FAFAFA; }
+
+        .check-indicator {
+            display: flex; align-items: center; gap: 6px; color: var(--success); font-size: 0.85rem; font-weight: 600;
+            background: rgba(16, 185, 129, 0.08); padding: 6px 12px; border-radius: 20px;
+        }
+
+        .tab-bar {
+            background: #FFFFFF; border-top: 1px solid var(--border);
+            height: calc(var(--tab-h) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
+            display: flex; justify-content: space-around; align-items: center; z-index: 100;
+        }
+        .tab-item {
+            flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+            height: 100%; color: #999; cursor: pointer; transition: color 0.2s;
+        }
+        .tab-item i { font-size: 1.3rem; margin-bottom: 6px; }
+        .tab-item span { font-size: 0.65rem; font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase; }
+        .tab-item.active { color: var(--primary); }
+
         .modal-overlay {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 200;
-            display: none; justify-content: center; align-items: flex-end; /* Sheet style */
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; opacity: 0; visibility: hidden;
+            transition: all 0.3s; display: flex; align-items: flex-end; backdrop-filter: blur(4px);
         }
+        .modal-overlay.active { opacity: 1; visibility: visible; }
         .modal-sheet {
-            background: var(--surface); width: 100%; max-width: 600px;
-            border-radius: 24px 24px 0 0; padding: 24px;
-            animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-            max-height: 90vh; overflow-y: auto;
+            background: var(--surface); width: 100%; height: 80vh; border-radius: 24px 24px 0 0;
+            padding: 30px; transform: translateY(100%); transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow-y: auto;
         }
-        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-
-        .sheet-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-        .sheet-user h2 { font-family: 'Playfair Display', serif; font-size: 1.5rem; }
-        .sheet-user p { color: var(--text-secondary); font-size: 0.9rem; }
-        .btn-close { background: #f2f2f7; border: none; width: 30px; height: 30px; border-radius: 50%; font-size: 1rem; cursor: pointer; }
-
-        /* Grid en Modal (Ahora 2x2) */
-        .sheet-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 24px; }
-        .mini-stat { background: var(--bg); padding: 12px; border-radius: 12px; text-align: center; }
-        .mini-val { font-weight: 700; font-size: 1.1rem; }
-        .mini-lbl { font-size: 0.7rem; color: var(--text-secondary); }
+        .modal-overlay.active .modal-sheet { transform: translateY(0); }
         
-        /* Diferenciar stats en el modal */
-        .st-hours .mini-val { color: #007aff; }
-        .st-studies .mini-val { color: #ff9500; }
-
-        /* Gráfica Modal */
-        .user-chart-container { height: 250px; width: 100%; margin-bottom: 20px; }
+        .sheet-handle { width: 40px; height: 4px; background: #E0E0E0; border-radius: 10px; margin: 0 auto 30px; }
+        .sheet-header { text-align: center; margin-bottom: 30px; }
+        .sheet-avatar { 
+            width: 80px; height: 80px; border-radius: 50%; background: #FAFAFA; border: 1px solid #E5E5E5; margin: 0 auto 15px;
+            display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: 700; color: var(--text-main);
+        }
+        .chart-container { position: relative; height: 220px; width: 100%; margin-top: 10px; }
 
     </style>
 </head>
 <body>
 
     <div id="login-view">
-        <div class="login-card">
-            <h1>Admin</h1>
-            <div class="input-wrapper">
-                <input type="password" id="admin-pass" placeholder="••••" maxlength="8">
-            </div>
-            <button class="btn-login" onclick="attemptLogin()">Entrar</button>
-            <p id="login-error" style="color: #ff3b30; font-size: 0.8rem; margin-top: 10px; display: none;">Código incorrecto</p>
+        <div class="login-content">
+            <div class="logo-area"><i class="fas fa-layer-group"></i></div>
+            <h1 class="login-title">Administración</h1>
+            <p class="login-sub">Ingrese credenciales de acceso</p>
+            <input type="password" id="admin-pass" class="pin-input" placeholder="PIN" maxlength="8" inputmode="numeric">
+            <button class="btn-primary" onclick="attemptLogin()">Iniciar Sesión</button>
+            <p id="login-error" style="color: #ef4444; font-size: 0.8rem; margin-top: 20px; opacity: 0;">
+                <i class="fas fa-exclamation-circle"></i> Credenciales incorrectas
+            </p>
         </div>
     </div>
 
-    <div id="dashboard-view">
-        <header>
-            <div class="header-top">
-                <h2>Panel de Control</h2>
-                <button class="btn-logout" onclick="logout()">Salir</button>
-            </div>
-            <div class="month-filter-container">
+    <div id="app-view">
+        <header class="top-nav">
+            <div class="nav-title" id="page-title">Panorama</div>
+            <div class="month-picker">
                 <i class="far fa-calendar-alt"></i>
                 <input type="month" id="month-selector" onchange="handleMonthChange()">
             </div>
         </header>
 
-        <div class="content-scroll">
-            
-            <div class="chart-section">
-                <div class="chart-card">
-                    <div class="chart-title">
-                        <span>Tendencia Semestral</span>
-                        <span style="font-size: 0.7rem; background: #eef; padding: 2px 6px; border-radius:4px; color: var(--accent);">Todos</span>
+        <main class="main-content">
+            <section id="tab-dashboard" class="page-section active">
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-box-icon" style="background: rgba(0, 0, 0, 0.05); color: var(--primary);"><i class="fas fa-file-alt"></i></div>
+                        <span class="stat-box-val" id="stat-total-pubs">0</span>
+                        <span class="stat-box-lbl">Informes</span>
                     </div>
-                    <canvas id="globalChart"></canvas>
+                    <div class="stat-box">
+                        <div class="stat-box-icon" style="background: rgba(245, 158, 11, 0.1); color: var(--warning);"><i class="fas fa-book-reader"></i></div>
+                        <span class="stat-box-val" id="stat-total-studies">0</span>
+                        <span class="stat-box-lbl">Estudios</span>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-box-icon" style="background: rgba(16, 185, 129, 0.1); color: var(--success);"><i class="fas fa-stopwatch"></i></div>
+                        <span class="stat-box-val" id="stat-avg-reg">0</span>
+                        <span class="stat-box-lbl">Prom. Reg.</span>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-box-icon" style="background: rgba(88, 86, 214, 0.1); color: var(--accent-indigo);"><i class="far fa-clock"></i></div>
+                        <span class="stat-box-val" id="stat-avg-aux">0</span>
+                        <span class="stat-box-lbl">Prom. Aux.</span>
+                    </div>
                 </div>
-            </div>
 
-            <div class="stats-container">
-                <div class="stat-card stat-pub">
-                    <div class="stat-icon"><i class="fas fa-users"></i></div>
-                    <div class="stat-value" id="stat-total">0</div>
-                    <div class="stat-label">Informes</div>
+                <div class="card">
+                    <div class="card-header">
+                        <span class="card-title">Tendencia Semestral</span>
+                    </div>
+                    <div class="segmented-control">
+                        <button class="segment-btn active" onclick="switchGlobalChart('horas', this)">Horas</button>
+                        <button class="segment-btn" onclick="switchGlobalChart('estudios', this)">Estudios</button>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="globalChart"></canvas>
+                    </div>
                 </div>
-                <div class="stat-card stat-study">
-                    <div class="stat-icon"><i class="fas fa-book-open"></i></div>
-                    <div class="stat-value" id="stat-studies">0</div>
-                    <div class="stat-label">Total Estudios</div>
-                </div>
-                
-                <div class="stat-card stat-reg">
-                    <div class="stat-icon"><i class="fas fa-clock"></i></div>
-                    <div class="stat-value" id="stat-avg-reg">0</div>
-                    <div class="stat-label">Prom. Regular</div>
-                </div>
-                <div class="stat-card stat-aux">
-                    <div class="stat-icon"><i class="far fa-clock"></i></div>
-                    <div class="stat-value" id="stat-avg-aux">0</div>
-                    <div class="stat-label">Prom. Auxiliar</div>
-                </div>
-            </div>
 
-            <div class="list-header">Detalle del Mes</div>
-            <div class="reports-list" id="reports-list">
-                <div style="text-align: center; color: #8e8e93; padding: 20px;">Cargando...</div>
+                <div class="card">
+                    <div class="card-header" style="margin-bottom: 12px;">
+                        <span class="card-title">Recepción de Informes</span>
+                        <span style="font-size: 0.8rem; font-weight: 600;" id="progress-text">0/0</span>
+                    </div>
+                    <div style="height: 6px; background: #F0F0F0; border-radius: 4px; overflow: hidden; width: 100%;">
+                        <div id="progress-bar-fill" style="width: 0%; height: 100%; background: var(--primary); border-radius: 4px;"></div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="tab-list" class="page-section">
+                <div class="search-bar">
+                    <div class="search-input-wrapper">
+                        <i class="fas fa-search"></i>
+                        <input type="text" class="search-input" id="search-input" placeholder="Buscar por nombre..." onkeyup="filterList()">
+                    </div>
+                </div>
+                <div class="pub-list" id="reports-list-container">
+                    <div style="text-align: center; color: #999; padding: 30px;">Cargando directorio...</div>
+                </div>
+            </section>
+        </main>
+
+        <nav class="tab-bar">
+            <div class="tab-item active" onclick="switchTab('dashboard')">
+                <i class="fas fa-chart-pie"></i><span>Resumen</span>
             </div>
-        </div>
+            <div class="tab-item" onclick="switchTab('list')">
+                <i class="fas fa-address-book"></i><span>Directorio</span>
+            </div>
+            <div class="tab-item" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i><span>Salir</span>
+            </div>
+        </nav>
     </div>
 
     <div class="modal-overlay" id="user-modal" onclick="closeUserModal(event)">
         <div class="modal-sheet" onclick="event.stopPropagation()">
+            <div class="sheet-handle"></div>
             <div class="sheet-header">
-                <div class="sheet-user">
-                    <h2 id="modal-name">Nombre</h2>
-                    <p id="modal-type">Tipo de Publicador</p>
-                </div>
-                <button class="btn-close" onclick="closeUserModal()"><i class="fas fa-times"></i></button>
+                <div class="sheet-avatar" id="modal-avatar">JP</div>
+                <h2 id="modal-name" style="margin-bottom: 5px; font-size: 1.4rem;">Nombre</h2>
+                <span id="modal-type" class="badge badge-pub">Publicador</span>
             </div>
-
-            <div class="sheet-stats">
-                <div class="mini-stat st-hours">
-                    <div class="mini-val" id="modal-total-hours">0</div>
-                    <div class="mini-lbl">Horas (6 meses)</div>
+            <div class="stats-grid">
+                <div class="stat-box" style="background: #FAFAFA; border: none; box-shadow: none;">
+                    <span class="stat-box-lbl">Promedio Horas</span>
+                    <span class="stat-box-val" style="color: var(--primary);" id="personal-avg-hours">0</span>
                 </div>
-                <div class="mini-stat st-hours">
-                    <div class="mini-val" id="modal-avg-hours">0</div>
-                    <div class="mini-lbl">Prom. Horas</div>
-                </div>
-                <div class="mini-stat st-studies">
-                    <div class="mini-val" id="modal-total-studies">0</div>
-                    <div class="mini-lbl">Estudios (6 meses)</div>
-                </div>
-                <div class="mini-stat st-studies">
-                    <div class="mini-val" id="modal-avg-studies">0</div>
-                    <div class="mini-lbl">Prom. Estudios</div>
+                <div class="stat-box" style="background: #FAFAFA; border: none; box-shadow: none;">
+                    <span class="stat-box-lbl">Promedio Estudios</span>
+                    <span class="stat-box-val" style="color: var(--warning);" id="personal-avg-studies">0</span>
                 </div>
             </div>
-
-            <h4 style="margin-bottom: 15px; font-size: 0.9rem;">Progreso Personal</h4>
-            <div class="user-chart-container">
-                <canvas id="userChart"></canvas>
+            <div class="card" style="box-shadow: none; border: 1px solid #E5E5E5;">
+                <div class="card-header"><span class="card-title">Historial (6 meses)</span></div>
+                <div class="chart-container" style="height: 180px;"><canvas id="userChart"></canvas></div>
             </div>
-            
-            <div style="background: var(--bg); padding: 15px; border-radius: 12px; margin-top: 10px;">
-                <h5 style="margin-bottom: 5px; font-size: 0.85rem;">Última Observación:</h5>
-                <p id="modal-obs" style="font-size: 0.85rem; color: var(--text-secondary); font-style: italic;">Ninguna</p>
+            <div class="card" style="box-shadow: none; border: 1px solid #E5E5E5; background: #FAFAFA;">
+                <span class="card-title" style="display:block; margin-bottom: 8px;">OBSERVACIONES</span>
+                <p id="modal-obs" style="font-size: 0.95rem; line-height: 1.5; color: var(--text-main);">Sin observaciones.</p>
             </div>
+            <button class="btn-primary" onclick="closeUserModal()" style="background: #000; color: #fff; margin-top: 10px;">Cerrar Ficha</button>
         </div>
     </div>
 
     <script>
+        // CONFIGURACIÓN SUPABASE
         const SUPABASE_URL = 'https://bitdiyawwvmatxuckaob.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpdGRpeWF3d3ZtYXR4dWNrYW9iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc1NjIwNTksImV4cCI6MjA4MzEzODA1OX0.kdGxKiQ5INhJAB7ZSwxcy5e8z1XZ73M02IEzHZgEdW0';
         const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-        let allReports = []; // Todos los datos crudos
-        let globalChartInstance = null;
-        let userChartInstance = null;
-
         const ADMIN_PIN = "admin123";
 
-        // Configuración Global de Charts
-        Chart.defaults.font.family = "'Inter', sans-serif";
-        Chart.defaults.color = '#8e8e93';
-        Chart.defaults.scale.grid.color = '#f2f2f7';
+        // ESTADO GLOBAL
+        let allReports = [];
+        let globalChartInstance = null;
+        let userChartInstance = null;
+        let currentMetric = 'horas'; 
 
-        // --- LOGIN ---
+        // CONFIG CHART.JS
+        Chart.defaults.font.family = "'DM Sans', sans-serif";
+        Chart.defaults.color = '#999';
+
+        // --- FUNCIONES DE ACCESO ---
         function attemptLogin() {
-            const input = document.getElementById('admin-pass').value;
-            if(input === ADMIN_PIN) {
+            const input = document.getElementById('admin-pass');
+            if(input.value === ADMIN_PIN) {
                 document.getElementById('login-view').style.display = 'none';
-                document.getElementById('dashboard-view').style.display = 'flex';
-                initDashboard();
+                document.getElementById('app-view').style.display = 'flex';
+                initApp();
             } else {
                 const err = document.getElementById('login-error');
-                err.style.display = 'block';
-                setTimeout(() => err.style.display = 'none', 2000);
+                err.style.opacity = '1';
+                setTimeout(()=> err.style.opacity = '0', 2000);
             }
         }
         function logout() { location.reload(); }
 
-        // --- INICIALIZACIÓN ---
-        async function initDashboard() {
-            const today = new Date();
-            const year = today.getFullYear();
-            const month = String(today.getMonth() + 1).padStart(2, '0');
-            document.getElementById('month-selector').value = `${year}-${month}`;
+        // --- INICIO APP ---
+        async function initApp() {
+            // Calcular el "Mes de Servicio" actual basado en hoy
+            // Si hoy es Ene 5, el mes de servicio activo es Diciembre
+            const now = new Date();
+            if(now.getDate() <= 10) {
+                now.setMonth(now.getMonth() - 1);
+            }
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2,'0');
+            document.getElementById('month-selector').value = `${y}-${m}`;
 
-            await fetchAllReports();
+            await fetchData();
             
-            supabaseClient
-                .channel('public:informes')
+            supabaseClient.channel('public:informes')
                 .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'informes' }, payload => {
-                    allReports.unshift(payload.new);
-                    updateDashboard();
-                })
-                .subscribe();
+                    // Procesar nuevo reporte entrante
+                    const processed = processReportLogic(payload.new);
+                    allReports.unshift(processed);
+                    updateUI();
+                }).subscribe();
         }
 
-        async function fetchAllReports() {
+        async function fetchData() {
             try {
-                let { data, error } = await supabaseClient
-                    .from('informes')
-                    .select('*')
-                    .order('created_at', { ascending: false });
-
+                let { data, error } = await supabaseClient.from('informes').select('*').order('created_at', { ascending: false });
                 if (error) throw error;
-                allReports = data;
-                updateDashboard();
+                // Procesar la fecha de servicio para todos los datos
+                allReports = data.map(processReportLogic);
+                updateUI();
             } catch (err) {
                 console.error(err);
-                document.getElementById('reports-list').innerHTML = 'Error de conexión';
             }
         }
 
-        function updateDashboard() {
-            renderGlobalChart();
-            filterAndRenderList();
+        // --- LÓGICA CRÍTICA: REGLA DE LOS 10 DÍAS ---
+        function processReportLogic(report) {
+            const createdAt = new Date(report.created_at);
+            const day = createdAt.getDate();
+            
+            // Si el informe se envió los primeros 10 días, pertenece al mes anterior.
+            // Clonamos la fecha para no alterar la original
+            const serviceDate = new Date(createdAt); 
+            
+            if (day <= 10) {
+                serviceDate.setMonth(serviceDate.getMonth() - 1);
+            }
+
+            const y = serviceDate.getFullYear();
+            const m = String(serviceDate.getMonth() + 1).padStart(2, '0');
+            
+            // Asignamos una nueva propiedad virtual 'mes_servicio' formato YYYY-MM
+            return {
+                ...report,
+                mes_servicio: `${y}-${m}`, 
+                timestamp_servicio: serviceDate.getTime() // Útil para ordenar
+            };
+        }
+
+        function updateUI() {
+            renderDashboardStats();
+            renderGlobalChart(currentMetric);
+            renderList();
         }
 
         function handleMonthChange() {
-            filterAndRenderList(); 
+            renderDashboardStats();
+            renderList();
         }
 
-        // --- LÓGICA DE GRÁFICA GLOBAL ---
-        function renderGlobalChart() {
-            const ctx = document.getElementById('globalChart').getContext('2d');
-            
-            const months = [];
-            const hoursData = [];
-            const studiesData = [];
-            
-            for (let i = 5; i >= 0; i--) {
-                const d = new Date();
-                d.setMonth(d.getMonth() - i);
-                const monthKey = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-                const monthLabel = d.toLocaleDateString('es-ES', { month: 'short' });
-                
-                const reportsInMonth = allReports.filter(r => r.created_at.startsWith(monthKey));
-                const sumHours = reportsInMonth.reduce((acc, curr) => acc + (curr.horas || 0), 0);
-                const sumStudies = reportsInMonth.reduce((acc, curr) => acc + (curr.estudios || 0), 0);
+        function switchTab(tabName) {
+            document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+            const tabBtnIndex = tabName === 'dashboard' ? 0 : 1;
+            document.querySelectorAll('.tab-item')[tabBtnIndex].classList.add('active');
+            if(tabName === 'dashboard') document.getElementById('page-title').innerText = 'Panorama';
+            else document.getElementById('page-title').innerText = 'Directorio';
+        }
 
-                months.push(monthLabel);
-                hoursData.push(sumHours);
-                studiesData.push(sumStudies);
+        // --- DASHBOARD (FILTRO POR MES DE SERVICIO) ---
+        function renderDashboardStats() {
+            const selectedMonth = document.getElementById('month-selector').value;
+            // Filtramos usando la propiedad calculada 'mes_servicio'
+            const monthData = allReports.filter(r => r.mes_servicio === selectedMonth);
+
+            document.getElementById('stat-total-pubs').innerText = monthData.length;
+            document.getElementById('stat-total-studies').innerText = monthData.reduce((a,b)=> a + (b.estudios||0), 0);
+
+            const regs = monthData.filter(r => r.tipo === 'Precursor Regular');
+            const auxs = monthData.filter(r => r.tipo === 'Precursor Auxiliar');
+
+            const avgReg = regs.length ? (regs.reduce((a,b)=>a+(b.horas||0),0) / regs.length).toFixed(1) : 0;
+            const avgAux = auxs.length ? (auxs.reduce((a,b)=>a+(b.horas||0),0) / auxs.length).toFixed(1) : 0;
+
+            document.getElementById('stat-avg-reg').innerText = avgReg;
+            document.getElementById('stat-avg-aux').innerText = avgAux;
+
+            const estimatedTotalPubs = 50; 
+            const progress = Math.min((monthData.length / estimatedTotalPubs) * 100, 100);
+            document.getElementById('progress-bar-fill').style.width = `${progress}%`;
+            document.getElementById('progress-text').innerText = `${monthData.length} recibidos`;
+        }
+
+        function switchGlobalChart(metric, btn) {
+            currentMetric = metric;
+            document.querySelectorAll('.segment-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            renderGlobalChart(metric);
+        }
+
+        // --- GRÁFICA GLOBAL (BASADA EN MES DE SERVICIO) ---
+        function renderGlobalChart(metric) {
+            const ctx = document.getElementById('globalChart').getContext('2d');
+            const labels = [];
+            const dataValues = [];
+            
+            // Usamos lógica de Mes de Servicio para los últimos 6 meses
+            // Asumimos el mes "actual" basado en la fecha de hoy con la regla de 10 días
+            const now = new Date();
+            if(now.getDate() <= 10) now.setMonth(now.getMonth() - 1);
+
+            for(let i=5; i>=0; i--){
+                const d = new Date(now);
+                d.setMonth(d.getMonth() - i);
+                const k = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+                
+                labels.push(d.toLocaleDateString('es-ES', {month:'short'}));
+                
+                // Filtro importante: usar mes_servicio
+                const reports = allReports.filter(r => r.mes_servicio === k);
+                const sum = reports.reduce((acc, curr) => acc + (curr[metric] || 0), 0);
+                dataValues.push(sum);
             }
 
-            if (globalChartInstance) globalChartInstance.destroy();
+            const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+            const color = metric === 'horas' ? '#007AFF' : '#F59E0B'; 
+            gradient.addColorStop(0, metric === 'horas' ? 'rgba(0,122,255, 0.2)' : 'rgba(245,158,11, 0.2)');
+            gradient.addColorStop(1, 'rgba(255,255,255, 0)');
+
+            if(globalChartInstance) globalChartInstance.destroy();
 
             globalChartInstance = new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: months,
-                    datasets: [
-                        {
-                            label: 'Horas',
-                            data: hoursData,
-                            borderColor: '#007aff',
-                            backgroundColor: 'rgba(0,122,255,0.1)',
-                            borderWidth: 2,
-                            tension: 0.4,
-                            fill: true,
-                            yAxisID: 'y'
-                        },
-                        {
-                            label: 'Estudios',
-                            data: studiesData,
-                            borderColor: '#ff9500',
-                            backgroundColor: 'transparent',
-                            borderWidth: 2,
-                            borderDash: [5, 5],
-                            tension: 0.4,
-                            yAxisID: 'y1'
-                        }
-                    ]
+                    labels: labels,
+                    datasets: [{
+                        data: dataValues,
+                        borderColor: color,
+                        backgroundColor: gradient,
+                        borderWidth: 2,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: color,
+                        pointRadius: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
                     plugins: { legend: { display: false } },
                     scales: {
-                        x: { grid: { display: false } },
-                        y: { display: false },
-                        y1: { display: false, grid: { display: false } }
+                        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                        y: { display: false }
                     }
                 }
             });
         }
 
-        // --- LÓGICA DE LISTA Y STATS POR MES ---
-        function filterAndRenderList() {
-            const selectedMonth = document.getElementById('month-selector').value; 
-            if(!selectedMonth) return;
-
-            // Filtrar solo los datos del mes seleccionado
-            const monthReports = allReports.filter(item => item.created_at.startsWith(selectedMonth));
+        // --- LISTA (FILTRADA POR MES DE SERVICIO) ---
+        function renderList() {
+            const container = document.getElementById('reports-list-container');
+            const selectedMonth = document.getElementById('month-selector').value;
+            const filterText = document.getElementById('search-input').value.toLowerCase();
             
-            const totalReports = monthReports.length;
-            const totalStudies = monthReports.reduce((sum, r) => sum + (r.estudios || 0), 0);
+            const listData = allReports.filter(r => {
+                // Filtro corregido: Usar mes_servicio
+                const matchesMonth = r.mes_servicio === selectedMonth;
+                const matchesName = (r.nombre + " " + r.apellido).toLowerCase().includes(filterText);
+                return matchesMonth && matchesName;
+            });
 
-            // CÁLCULO DE PROMEDIOS SEPARADOS
-            // 1. Regulares
-            const regulars = monthReports.filter(r => r.tipo === 'Precursor Regular');
-            const totalHoursReg = regulars.reduce((sum, item) => sum + (item.horas || 0), 0);
-            const avgReg = regulars.length > 0 ? (totalHoursReg / regulars.length).toFixed(1) : 0;
-
-            // 2. Auxiliares
-            const auxiliars = monthReports.filter(r => r.tipo === 'Precursor Auxiliar');
-            const totalHoursAux = auxiliars.reduce((sum, item) => sum + (item.horas || 0), 0);
-            const avgAux = auxiliars.length > 0 ? (totalHoursAux / auxiliars.length).toFixed(1) : 0;
-
-            // Actualizar Tarjetas del Dashboard
-            document.getElementById('stat-total').innerText = totalReports;
-            document.getElementById('stat-studies').innerText = totalStudies;
-            document.getElementById('stat-avg-reg').innerText = avgReg;
-            document.getElementById('stat-avg-aux').innerText = avgAux;
-
-            // Renderizar Lista
-            const listEl = document.getElementById('reports-list');
-            listEl.innerHTML = '';
-
-            if (monthReports.length === 0) {
-                listEl.innerHTML = '<div style="text-align:center; padding:30px; color:#aaa">No hay informes en este mes</div>';
+            container.innerHTML = '';
+            if(!listData.length) {
+                container.innerHTML = '<div style="text-align:center; padding:20px; color:#aaa; font-size:0.9rem;">No hay informes.</div>';
                 return;
             }
 
-            monthReports.forEach(item => {
+            listData.forEach(item => {
                 const initials = (item.nombre[0] + item.apellido[0]).toUpperCase();
-                let typeShort = item.tipo;
-                if(typeShort === 'Precursor Regular') typeShort = 'Regular';
-                if(typeShort === 'Precursor Auxiliar') typeShort = 'Auxiliar';
-                
-                const hoursDisplay = (item.horas > 0) ? `${item.horas}h` : '<i class="fas fa-check"></i>';
-                
-                const estudios = item.estudios || 0;
-                const studyClass = estudios > 0 ? 'active' : 'empty';
-                const studyIcon = estudios > 0 ? '<i class="fas fa-book-open"></i>' : '';
+                let badgeClass = 'badge-pub';
+                if(item.tipo.includes('Regular')) badgeClass = 'badge-reg';
+                if(item.tipo.includes('Auxiliar')) badgeClass = 'badge-aux';
 
-                const div = document.createElement('div');
-                div.className = 'report-item';
-                div.onclick = () => openUserModal(item.nombre, item.apellido, item.tipo, item.observaciones);
-                div.innerHTML = `
-                    <div class="user-info">
-                        <div class="avatar">${initials}</div>
-                        <div class="name-col">
-                            <h4>${item.nombre} ${item.apellido}</h4>
-                            <p>${new Date(item.created_at).toLocaleDateString()}</p>
+                let metricsHtml = '';
+                const hasStudies = item.estudios && item.estudios > 0;
+                
+                // Visualización: Check verde si es publicador sin estudios que predicó
+                if (item.tipo === 'Publicador' && !hasStudies) {
+                    if (item.predico === 'Sí' || item.predico === 'Si') {
+                        metricsHtml = `<div class="check-indicator"><i class="fas fa-check"></i> <span>Participó</span></div>`;
+                    } else {
+                        metricsHtml = `<span style="color:var(--text-sec); font-size:0.8rem;">No participó</span>`;
+                    }
+                } else {
+                    metricsHtml = `
+                        <div style="font-weight:700; font-size:0.95rem; color: var(--text-main);">${item.horas || 0}h</div>
+                        <div style="font-size:0.75rem; color:var(--text-sec);">${item.estudios||0} est.</div>
+                    `;
+                }
+
+                const el = document.createElement('div');
+                el.className = 'pub-item';
+                el.onclick = () => openUserModal(item);
+                el.innerHTML = `
+                    <div style="display:flex; align-items:center;">
+                        <div class="pub-avatar">${initials}</div>
+                        <div class="pub-info">
+                            <h3>${item.nombre} ${item.apellido}</h3>
+                            <span class="badge ${badgeClass}">${item.tipo}</span>
                         </div>
                     </div>
-                    <div class="data-col">
-                        <div class="metrics-line">
-                            <span class="study-indicator ${studyClass}">
-                                ${studyIcon} ${estudios} est.
-                            </span>
-                            <div class="data-hours">${hoursDisplay}</div>
-                        </div>
-                        <span class="data-badge">${typeShort}</span>
-                    </div>
+                    <div class="pub-metrics">${metricsHtml}</div>
                 `;
-                listEl.appendChild(div);
+                container.appendChild(el);
             });
         }
 
-        // --- MODAL Y GRÁFICA INDIVIDUAL ---
-        function openUserModal(nombre, apellido, tipo, observaciones) {
+        function filterList() { renderList(); }
+
+        // --- MODAL DETALLE & GRÁFICA (MES DE SERVICIO) ---
+        function openUserModal(user) {
             const modal = document.getElementById('user-modal');
-            modal.style.display = 'flex';
-            
-            document.getElementById('modal-name').innerText = `${nombre} ${apellido}`;
-            document.getElementById('modal-type').innerText = tipo;
-            document.getElementById('modal-obs').innerText = observaciones || "Sin observaciones recientes.";
+            modal.classList.add('active');
 
-            // Filtrar HISTORIAL COMPLETO
-            const userHistory = allReports.filter(r => 
-                r.nombre.toLowerCase() === nombre.toLowerCase() && 
-                r.apellido.toLowerCase() === apellido.toLowerCase()
-            ).sort((a,b) => new Date(a.created_at) - new Date(b.created_at)); 
+            document.getElementById('modal-avatar').innerText = (user.nombre[0] + user.apellido[0]).toUpperCase();
+            document.getElementById('modal-name').innerText = `${user.nombre} ${user.apellido}`;
+            document.getElementById('modal-type').innerText = user.tipo;
+            document.getElementById('modal-obs').innerText = user.observaciones || "Sin observaciones.";
 
-            // Datos para gráfica (Últimos 6 meses)
-            const historySlice = userHistory.slice(-6); 
-            
-            const labels = historySlice.map(r => {
-                const d = new Date(r.created_at);
-                return d.toLocaleDateString('es-ES', { month: 'short' });
-            });
-            const dataHours = historySlice.map(r => r.horas || 0);
-            const dataStudies = historySlice.map(r => r.estudios || 0);
+            // Filtramos historial del usuario ordenado por mes de servicio
+            const history = allReports.filter(r => 
+                r.nombre.toLowerCase() === user.nombre.toLowerCase() && 
+                r.apellido.toLowerCase() === user.apellido.toLowerCase()
+            ).sort((a,b) => a.timestamp_servicio - b.timestamp_servicio).slice(-6);
 
-            // CÁLCULOS ESTADÍSTICOS PERSONALES (De todo el historial disponible)
-            const count = userHistory.length;
-            
-            // Horas
-            const sumUserHours = userHistory.reduce((a,b) => a + (b.horas||0), 0);
-            const avgUserHours = count ? (sumUserHours / count).toFixed(1) : 0;
-            
-            // Estudios
-            const sumUserStudies = userHistory.reduce((a,b) => a + (b.estudios||0), 0);
-            const avgUserStudies = count ? (sumUserStudies / count).toFixed(1) : 0;
-            
-            // Pintar en el Grid
-            document.getElementById('modal-total-hours').innerText = sumUserHours;
-            document.getElementById('modal-avg-hours').innerText = avgUserHours;
-            document.getElementById('modal-total-studies').innerText = sumUserStudies;
-            document.getElementById('modal-avg-studies').innerText = avgUserStudies;
+            if(history.length) {
+                const avgH = (history.reduce((a,b)=>a+(b.horas||0),0)/history.length).toFixed(1);
+                const avgS = (history.reduce((a,b)=>a+(b.estudios||0),0)/history.length).toFixed(1);
+                document.getElementById('personal-avg-hours').innerText = avgH;
+                document.getElementById('personal-avg-studies').innerText = avgS;
+            }
 
-            // Renderizar Gráfica
+            renderUserChart(history);
+        }
+
+        function renderUserChart(historyData) {
             const ctx = document.getElementById('userChart').getContext('2d');
-            if (userChartInstance) userChartInstance.destroy();
+            
+            // Usamos las fechas de servicio para la gráfica
+            const labels = historyData.map(d => {
+                // Parseamos mes_servicio (YYYY-MM)
+                const parts = d.mes_servicio.split('-');
+                const date = new Date(parts[0], parts[1]-1, 1); 
+                return date.toLocaleDateString('es-ES', {month:'short'});
+            });
+            const dataH = historyData.map(d => d.horas || 0);
+
+            if(userChartInstance) userChartInstance.destroy();
 
             userChartInstance = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: labels,
-                    datasets: [
-                        {
-                            label: 'Horas',
-                            data: dataHours,
-                            backgroundColor: '#007aff',
-                            borderRadius: 6,
-                            barPercentage: 0.6,
-                            order: 2
-                        },
-                        {
-                            label: 'Estudios',
-                            type: 'line',
-                            data: dataStudies,
-                            borderColor: '#ff9500',
-                            borderWidth: 2,
-                            tension: 0.3,
-                            yAxisID: 'y1',
-                            order: 1
-                        }
-                    ]
+                    datasets: [{
+                        label: 'Horas',
+                        data: dataH,
+                        backgroundColor: '#000000',
+                        borderRadius: 4
+                    }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: { legend: { display: false } },
                     scales: {
-                        y: { beginAtZero: true, grid: { borderDash: [4, 4] } },
-                        y1: { display: false, position: 'right', beginAtZero: true, max: Math.max(...dataStudies) + 2 }, // Escala ajustada para estudios
-                        x: { grid: { display: false } }
+                        x: { grid: { display: false } },
+                        y: { display: false }
                     }
                 }
             });
         }
 
         function closeUserModal(e) {
-            if (e && e.target !== document.getElementById('user-modal')) return;
-            document.getElementById('user-modal').style.display = 'none';
+            if (e && e.target !== e.currentTarget) return;
+            document.getElementById('user-modal').classList.remove('active');
         }
 
-        document.getElementById('admin-pass').addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') attemptLogin();
-        });
     </script>
 </body>
 </html>
