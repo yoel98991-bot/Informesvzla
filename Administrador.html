@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -312,362 +311,413 @@
             <button class="btn-primary" onclick="closeUserModal()" style="background: #000; color: #fff; margin-top: 10px;">Cerrar Ficha</button>
         </div>
     </div>
+<script>
+    // CONFIGURACIÓN SUPABASE
+    const SUPABASE_URL = 'https://bitdiyawwvmatxuckaob.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpdGRpeWF3d3ZtYXR4dWNrYW9iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc1NjIwNTksImV4cCI6MjA4MzEzODA1OX0.kdGxKiQ5INhJAB7ZSwxcy5e8z1XZ73M02IEzHZgEdW0';
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const ADMIN_PIN = "admin123";
 
-    <script>
-        // CONFIGURACIÓN SUPABASE
-        const SUPABASE_URL = 'https://bitdiyawwvmatxuckaob.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJpdGRpeWF3d3ZtYXR4dWNrYW9iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc1NjIwNTksImV4cCI6MjA4MzEzODA1OX0.kdGxKiQ5INhJAB7ZSwxcy5e8z1XZ73M02IEzHZgEdW0';
-        const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        const ADMIN_PIN = "admin123";
+    // ESTADO GLOBAL
+    let allReports = [];
+    let allPublishers = []; // Nueva lista maestra
+    let globalChartInstance = null;
+    let userChartInstance = null;
+    let currentMetric = 'horas'; 
 
-        // ESTADO GLOBAL
-        let allReports = [];
-        let globalChartInstance = null;
-        let userChartInstance = null;
-        let currentMetric = 'horas'; 
+    // CONFIG CHART.JS
+    Chart.defaults.font.family = "'DM Sans', sans-serif";
+    Chart.defaults.color = '#999';
 
-        // CONFIG CHART.JS
-        Chart.defaults.font.family = "'DM Sans', sans-serif";
-        Chart.defaults.color = '#999';
-
-        // --- FUNCIONES DE ACCESO ---
-        function attemptLogin() {
-            const input = document.getElementById('admin-pass');
-            if(input.value === ADMIN_PIN) {
-                document.getElementById('login-view').style.display = 'none';
-                document.getElementById('app-view').style.display = 'flex';
-                initApp();
-            } else {
-                const err = document.getElementById('login-error');
-                err.style.opacity = '1';
-                setTimeout(()=> err.style.opacity = '0', 2000);
-            }
+    // --- FUNCIONES DE ACCESO ---
+    function attemptLogin() {
+        const input = document.getElementById('admin-pass');
+        if(input.value === ADMIN_PIN) {
+            document.getElementById('login-view').style.display = 'none';
+            document.getElementById('app-view').style.display = 'flex';
+            initApp();
+        } else {
+            const err = document.getElementById('login-error');
+            err.style.opacity = '1';
+            setTimeout(()=> err.style.opacity = '0', 2000);
         }
-        function logout() { location.reload(); }
+    }
+    function logout() { location.reload(); }
 
-        // --- INICIO APP ---
-        async function initApp() {
-            // Calcular el "Mes de Servicio" actual basado en hoy
-            // Si hoy es Ene 5, el mes de servicio activo es Diciembre
-            const now = new Date();
-            if(now.getDate() <= 10) {
-                now.setMonth(now.getMonth() - 1);
-            }
-            const y = now.getFullYear();
-            const m = String(now.getMonth() + 1).padStart(2,'0');
-            document.getElementById('month-selector').value = `${y}-${m}`;
-
-            await fetchData();
-            
-            supabaseClient.channel('public:informes')
-                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'informes' }, payload => {
-                    // Procesar nuevo reporte entrante
-                    const processed = processReportLogic(payload.new);
-                    allReports.unshift(processed);
-                    updateUI();
-                }).subscribe();
+    // --- INICIO APP ---
+    async function initApp() {
+        // Calcular Mes de Servicio (Regla de los 10 días)
+        const now = new Date();
+        if(now.getDate() <= 10) {
+            now.setMonth(now.getMonth() - 1);
         }
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2,'0');
+        document.getElementById('month-selector').value = `${y}-${m}`;
 
-        async function fetchData() {
-            try {
-                let { data, error } = await supabaseClient.from('informes').select('*').order('created_at', { ascending: false });
-                if (error) throw error;
-                // Procesar la fecha de servicio para todos los datos
-                allReports = data.map(processReportLogic);
+        await fetchData();
+        
+        // Escuchar cambios en tiempo real
+        supabaseClient.channel('public:informes')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'informes' }, payload => {
+                const processed = processReportLogic(payload.new);
+                allReports.unshift(processed);
                 updateUI();
-            } catch (err) {
-                console.error(err);
-            }
-        }
-
-        // --- LÓGICA CRÍTICA: REGLA DE LOS 10 DÍAS ---
-        function processReportLogic(report) {
-            const createdAt = new Date(report.created_at);
-            const day = createdAt.getDate();
-            
-            // Si el informe se envió los primeros 10 días, pertenece al mes anterior.
-            // Clonamos la fecha para no alterar la original
-            const serviceDate = new Date(createdAt); 
-            
-            if (day <= 10) {
-                serviceDate.setMonth(serviceDate.getMonth() - 1);
-            }
-
-            const y = serviceDate.getFullYear();
-            const m = String(serviceDate.getMonth() + 1).padStart(2, '0');
-            
-            // Asignamos una nueva propiedad virtual 'mes_servicio' formato YYYY-MM
-            return {
-                ...report,
-                mes_servicio: `${y}-${m}`, 
-                timestamp_servicio: serviceDate.getTime() // Útil para ordenar
-            };
-        }
-
-        function updateUI() {
-            renderDashboardStats();
-            renderGlobalChart(currentMetric);
-            renderList();
-        }
-
-        function handleMonthChange() {
-            renderDashboardStats();
-            renderList();
-        }
-
-        function switchTab(tabName) {
-            document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
-            document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
-            document.getElementById(`tab-${tabName}`).classList.add('active');
-            const tabBtnIndex = tabName === 'dashboard' ? 0 : 1;
-            document.querySelectorAll('.tab-item')[tabBtnIndex].classList.add('active');
-            if(tabName === 'dashboard') document.getElementById('page-title').innerText = 'Panorama';
-            else document.getElementById('page-title').innerText = 'Directorio';
-        }
-
-        // --- DASHBOARD (FILTRO POR MES DE SERVICIO) ---
-        function renderDashboardStats() {
-            const selectedMonth = document.getElementById('month-selector').value;
-            // Filtramos usando la propiedad calculada 'mes_servicio'
-            const monthData = allReports.filter(r => r.mes_servicio === selectedMonth);
-
-            document.getElementById('stat-total-pubs').innerText = monthData.length;
-            document.getElementById('stat-total-studies').innerText = monthData.reduce((a,b)=> a + (b.estudios||0), 0);
-
-            const regs = monthData.filter(r => r.tipo === 'Precursor Regular');
-            const auxs = monthData.filter(r => r.tipo === 'Precursor Auxiliar');
-
-            const avgReg = regs.length ? (regs.reduce((a,b)=>a+(b.horas||0),0) / regs.length).toFixed(1) : 0;
-            const avgAux = auxs.length ? (auxs.reduce((a,b)=>a+(b.horas||0),0) / auxs.length).toFixed(1) : 0;
-
-            document.getElementById('stat-avg-reg').innerText = avgReg;
-            document.getElementById('stat-avg-aux').innerText = avgAux;
-
-            const estimatedTotalPubs = 50; 
-            const progress = Math.min((monthData.length / estimatedTotalPubs) * 100, 100);
-            document.getElementById('progress-bar-fill').style.width = `${progress}%`;
-            document.getElementById('progress-text').innerText = `${monthData.length} recibidos`;
-        }
-
-        function switchGlobalChart(metric, btn) {
-            currentMetric = metric;
-            document.querySelectorAll('.segment-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            renderGlobalChart(metric);
-        }
-
-     function renderGlobalChart(metric) {
-    const ctx = document.getElementById('globalChart').getContext('2d');
-    const labels = [];
-    const dataValues = [];
-    
-    // Usamos lógica de Mes de Servicio para los últimos 6 meses
-    const now = new Date();
-    if(now.getDate() <= 10) now.setMonth(now.getMonth() - 1);
-
-    for(let i=5; i>=0; i--){
-        const d = new Date(now);
-        d.setMonth(d.getMonth() - i);
-        const k = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-        
-        // Etiqueta del eje X (Ej: Ene, Feb)
-        labels.push(d.toLocaleDateString('es-ES', {month:'short'}));
-        
-        const reports = allReports.filter(r => r.mes_servicio === k);
-        const sum = reports.reduce((acc, curr) => acc + (curr[metric] || 0), 0);
-        dataValues.push(sum);
+            }).subscribe();
     }
 
-    const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-    const color = metric === 'horas' ? '#007AFF' : '#F59E0B'; 
-    const labelText = metric === 'horas' ? 'Horas' : 'Estudios'; // Texto para el tooltip
-
-    gradient.addColorStop(0, metric === 'horas' ? 'rgba(0,122,255, 0.2)' : 'rgba(245,158,11, 0.2)');
-    gradient.addColorStop(1, 'rgba(255,255,255, 0)');
-
-    if(globalChartInstance) globalChartInstance.destroy();
-
-    globalChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: labelText, // <--- 1. Importante para que salga el nombre
-                data: dataValues,
-                borderColor: color,
-                backgroundColor: gradient,
-                borderWidth: 2,
-                pointBackgroundColor: '#fff',
-                pointBorderColor: color,
-                pointRadius: 4,     // Aumenté un poco el radio para facilitar la vista
-                pointHitRadius: 20, // Aumenta el área táctil alrededor del punto
-                fill: true,
-                tension: 0.4
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: {
-                mode: 'index',      // Muestra el dato al tocar cualquier parte de la columna vertical (no solo el punto)
-                intersect: false,   // No requiere tocar el punto exacto
-            },
-            plugins: { 
-                legend: { display: false },
-                tooltip: {
-                    enabled: true,
-                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                    titleColor: '#000',
-                    bodyColor: '#666',
-                    borderColor: '#E0E0E0',
-                    borderWidth: 1,
-                    displayColors: true,
-                    boxPadding: 4,
-                    padding: 10,
-                    callbacks: {
-                        label: function(context) {
-                            return ` ${context.dataset.label}: ${context.parsed.y}`;
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-                y: { display: false } // Mantiene el eje Y oculto para limpieza visual
-            }
-        }
-    });
-}
-
-        // --- LISTA (FILTRADA POR MES DE SERVICIO) ---
-        function renderList() {
-            const container = document.getElementById('reports-list-container');
-            const selectedMonth = document.getElementById('month-selector').value;
-            const filterText = document.getElementById('search-input').value.toLowerCase();
+    async function fetchData() {
+        try {
+            // 1. Obtener Informes
+            let { data: reportsData, error: errorReports } = await supabaseClient
+                .from('informes')
+                .select('*')
+                .order('created_at', { ascending: false });
             
-            const listData = allReports.filter(r => {
-                // Filtro corregido: Usar mes_servicio
-                const matchesMonth = r.mes_servicio === selectedMonth;
-                const matchesName = (r.nombre + " " + r.apellido).toLowerCase().includes(filterText);
-                return matchesMonth && matchesName;
-            });
+            if (errorReports) throw errorReports;
+            
+            // 2. Obtener Lista Maestra de Publicadores (Grupo 4)
+            let { data: pubsData, error: errorPubs } = await supabaseClient
+                .from('publicadores')
+                .select('*')
+                .order('apellido', { ascending: true });
 
-            container.innerHTML = '';
-            if(!listData.length) {
-                container.innerHTML = '<div style="text-align:center; padding:20px; color:#aaa; font-size:0.9rem;">No hay informes.</div>';
-                return;
+            if (errorPubs) throw errorPubs;
+
+            allReports = reportsData.map(processReportLogic);
+            allPublishers = pubsData; // Guardamos la lista maestra
+            
+            updateUI();
+        } catch (err) {
+            console.error('Error fetching data:', err);
+            alert("Error de conexión. Recarga la página.");
+        }
+    }
+
+    // Regla de los 10 días
+    function processReportLogic(report) {
+        const createdAt = new Date(report.created_at);
+        const day = createdAt.getDate();
+        const serviceDate = new Date(createdAt); 
+        
+        if (day <= 10) {
+            serviceDate.setMonth(serviceDate.getMonth() - 1);
+        }
+
+        const y = serviceDate.getFullYear();
+        const m = String(serviceDate.getMonth() + 1).padStart(2, '0');
+        
+        return {
+            ...report,
+            mes_servicio: `${y}-${m}`, 
+            timestamp_servicio: serviceDate.getTime()
+        };
+    }
+
+    function updateUI() {
+        renderDashboardStats();
+        renderGlobalChart(currentMetric);
+        renderList();
+    }
+
+    function handleMonthChange() {
+        updateUI(); // Actualizar todo al cambiar mes
+    }
+
+    function switchTab(tabName) {
+        document.querySelectorAll('.page-section').forEach(s => s.classList.remove('active'));
+        document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+        document.getElementById(`tab-${tabName}`).classList.add('active');
+        const tabBtnIndex = tabName === 'dashboard' ? 0 : 1;
+        document.querySelectorAll('.tab-item')[tabBtnIndex].classList.add('active');
+        document.getElementById('page-title').innerText = tabName === 'dashboard' ? 'Panorama' : 'Directorio G-4';
+    }
+
+    // --- LOGICA DE CRUCE DE DATOS (NUEVO) ---
+    // Función para limpiar strings y comparar (quita espacios, tildes y mayúsculas)
+    function normalizeStr(str) {
+        if (!str) return "";
+        return str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    }
+
+    function getCombinedDataForMonth() {
+        const selectedMonth = document.getElementById('month-selector').value;
+        const monthReports = allReports.filter(r => r.mes_servicio === selectedMonth);
+
+        // Mapeamos la lista de publicadores y buscamos si tienen informe
+        return allPublishers.map(pub => {
+            // Buscamos coincidencia por Nombre Y Apellido
+            const report = monthReports.find(r => 
+                normalizeStr(r.nombre) === normalizeStr(pub.nombre) && 
+                normalizeStr(r.apellido) === normalizeStr(pub.apellido)
+            );
+
+            if (report) {
+                return { ...pub, status: 'reported', reportData: report };
+            } else {
+                return { ...pub, status: 'missing', reportData: null };
             }
+        });
+    }
 
-            listData.forEach(item => {
-                const initials = (item.nombre[0] + item.apellido[0]).toUpperCase();
-                let badgeClass = 'badge-pub';
-                if(item.tipo.includes('Regular')) badgeClass = 'badge-reg';
-                if(item.tipo.includes('Auxiliar')) badgeClass = 'badge-aux';
+    // --- DASHBOARD ---
+    function renderDashboardStats() {
+        const combinedData = getCombinedDataForMonth();
+        
+        const reportedCount = combinedData.filter(p => p.status === 'reported').length;
+        const totalPubs = combinedData.length;
+        
+        // Estadísticas solo de los que informaron
+        const validReports = combinedData.filter(p => p.status === 'reported').map(p => p.reportData);
 
-                let metricsHtml = '';
-                const hasStudies = item.estudios && item.estudios > 0;
+        const totalStudies = validReports.reduce((a,b)=> a + (b.estudios||0), 0);
+        
+        const regs = validReports.filter(r => r.tipo === 'Precursor Regular');
+        const auxs = validReports.filter(r => r.tipo === 'Precursor Auxiliar');
+
+        const avgReg = regs.length ? (regs.reduce((a,b)=>a+(b.horas||0),0) / regs.length).toFixed(1) : 0;
+        const avgAux = auxs.length ? (auxs.reduce((a,b)=>a+(b.horas||0),0) / auxs.length).toFixed(1) : 0;
+
+        document.getElementById('stat-total-pubs').innerText = `${reportedCount}/${totalPubs}`;
+        document.getElementById('stat-total-studies').innerText = totalStudies;
+        document.getElementById('stat-avg-reg').innerText = avgReg;
+        document.getElementById('stat-avg-aux').innerText = avgAux;
+
+        // Barra de progreso
+        const progress = totalPubs > 0 ? (reportedCount / totalPubs) * 100 : 0;
+        document.getElementById('progress-bar-fill').style.width = `${progress}%`;
+        
+        // Color de la barra: Rojo si es bajo, Verde si es alto
+        if(progress < 50) document.getElementById('progress-bar-fill').style.background = '#ff3b30';
+        else document.getElementById('progress-bar-fill').style.background = 'var(--primary)';
+
+        document.getElementById('progress-text').innerText = `${totalPubs - reportedCount} faltantes`;
+    }
+
+    // --- DIRECTORIO (LISTA) ---
+    function renderList() {
+        const listContainer = document.getElementById('reports-list-container');
+        const searchTerm = normalizeStr(document.getElementById('search-input').value);
+        
+        // Obtenemos datos combinados (Lista Oficial + Estado del Informe)
+        let combinedData = getCombinedDataForMonth();
+
+        // Filtrar por búsqueda
+        if (searchTerm) {
+            combinedData = combinedData.filter(p => 
+                normalizeStr(p.nombre).includes(searchTerm) || 
+                normalizeStr(p.apellido).includes(searchTerm)
+            );
+        }
+
+        // Ordenar: Primero los Pendientes (Rojos), luego por apellido
+        combinedData.sort((a, b) => {
+            if (a.status === b.status) {
+                return a.apellido.localeCompare(b.apellido);
+            }
+            return a.status === 'missing' ? -1 : 1;
+        });
+
+        listContainer.innerHTML = '';
+
+        if(combinedData.length === 0) {
+            listContainer.innerHTML = '<div style="text-align:center; padding:20px; color:#999">No se encontraron publicadores.</div>';
+            return;
+        }
+
+        combinedData.forEach(item => {
+            const isMissing = item.status === 'missing';
+            const r = item.reportData || {}; // Datos del informe si existen
+            
+            // Determinar estilo según estado
+            let statusBadge = '';
+            let avatarClass = '';
+            let cardStyle = '';
+            let metricsHtml = '';
+
+            if (isMissing) {
+                // ESTILO INACTIVO / PENDIENTE
+                statusBadge = `<span class="badge" style="background:#FFE5E5; color:#D32F2F; border:1px solid #FFCDD2;">PENDIENTE</span>`;
+                avatarClass = 'background: #FFE5E5; color: #D32F2F; border-color: #FFCDD2;';
+                cardStyle = 'border-left: 4px solid #D32F2F;';
+                metricsHtml = `<span style="font-size:0.75rem; color:#D32F2F; font-weight:600;">Sin informe</span>`;
+            } else {
+                // ESTILO REPORTADO
+                const tipoClass = r.tipo === 'Precursor Regular' ? 'badge-reg' : (r.tipo === 'Precursor Auxiliar' ? 'badge-aux' : 'badge-pub');
+                const tipoLabel = r.tipo === 'Precursor Regular' ? 'PR' : (r.tipo === 'Precursor Auxiliar' ? 'PA' : 'Pub');
                 
-                // Visualización: Check verde si es publicador sin estudios que predicó
-                if (item.tipo === 'Publicador' && !hasStudies) {
-                    if (item.predico === 'Sí' || item.predico === 'Si') {
-                        metricsHtml = `<div class="check-indicator"><i class="fas fa-check"></i> <span>Participó</span></div>`;
-                    } else {
-                        metricsHtml = `<span style="color:var(--text-sec); font-size:0.8rem;">No participó</span>`;
-                    }
+                statusBadge = `<span class="badge ${tipoClass}">${tipoLabel}</span>`;
+                cardStyle = 'border-left: 4px solid #10B981;'; // Verde borde
+                
+                // Mostrar métricas según tipo
+                if (r.tipo === 'Publicador') {
+                     metricsHtml = `<div class="check-indicator" style="padding:4px 10px; font-size:0.75rem;"><i class="fas fa-check"></i> Informe</div>`;
                 } else {
                     metricsHtml = `
-                        <div style="font-weight:700; font-size:0.95rem; color: var(--text-main);">${item.horas || 0}h</div>
-                        <div style="font-size:0.75rem; color:var(--text-sec);">${item.estudios||0} est.</div>
+                        <div style="font-weight:700; font-size:0.9rem; color:var(--text-main);">${r.horas} h</div>
+                        <div style="font-size:0.7rem; color:var(--text-sec);">${r.estudios} est.</div>
                     `;
                 }
-
-                const el = document.createElement('div');
-                el.className = 'pub-item';
-                el.onclick = () => openUserModal(item);
-                el.innerHTML = `
-                    <div style="display:flex; align-items:center;">
-                        <div class="pub-avatar">${initials}</div>
-                        <div class="pub-info">
-                            <h3>${item.nombre} ${item.apellido}</h3>
-                            <span class="badge ${badgeClass}">${item.tipo}</span>
-                        </div>
-                    </div>
-                    <div class="pub-metrics">${metricsHtml}</div>
-                `;
-                container.appendChild(el);
-            });
-        }
-
-        function filterList() { renderList(); }
-
-        // --- MODAL DETALLE & GRÁFICA (MES DE SERVICIO) ---
-        function openUserModal(user) {
-            const modal = document.getElementById('user-modal');
-            modal.classList.add('active');
-
-            document.getElementById('modal-avatar').innerText = (user.nombre[0] + user.apellido[0]).toUpperCase();
-            document.getElementById('modal-name').innerText = `${user.nombre} ${user.apellido}`;
-            document.getElementById('modal-type').innerText = user.tipo;
-            document.getElementById('modal-obs').innerText = user.observaciones || "Sin observaciones.";
-
-            // Filtramos historial del usuario ordenado por mes de servicio
-            const history = allReports.filter(r => 
-                r.nombre.toLowerCase() === user.nombre.toLowerCase() && 
-                r.apellido.toLowerCase() === user.apellido.toLowerCase()
-            ).sort((a,b) => a.timestamp_servicio - b.timestamp_servicio).slice(-6);
-
-            if(history.length) {
-                const avgH = (history.reduce((a,b)=>a+(b.horas||0),0)/history.length).toFixed(1);
-                const avgS = (history.reduce((a,b)=>a+(b.estudios||0),0)/history.length).toFixed(1);
-                document.getElementById('personal-avg-hours').innerText = avgH;
-                document.getElementById('personal-avg-studies').innerText = avgS;
             }
 
-            renderUserChart(history);
-        }
+            const div = document.createElement('div');
+            div.className = 'pub-item';
+            div.style = cardStyle;
+            div.onclick = () => isMissing ? alert("Este publicador no ha enviado informe este mes.") : openUserModal(item);
 
-        function renderUserChart(historyData) {
-            const ctx = document.getElementById('userChart').getContext('2d');
+            div.innerHTML = `
+                <div style="display:flex; align-items:center;">
+                    <div class="pub-avatar" style="${avatarClass}">
+                        ${item.nombre.charAt(0)}${item.apellido.charAt(0)}
+                    </div>
+                    <div class="pub-info">
+                        <h3>${item.apellido}, ${item.nombre}</h3>
+                        ${statusBadge}
+                    </div>
+                </div>
+                <div class="pub-metrics">
+                    ${metricsHtml}
+                </div>
+            `;
+            listContainer.appendChild(div);
+        });
+    }
+
+    function filterList() {
+        renderList();
+    }
+
+    // --- MODAL DE USUARIO ---
+    function openUserModal(pubData) {
+        if (!pubData.reportData) return;
+        const r = pubData.reportData;
+
+        document.getElementById('user-modal').classList.add('active');
+        document.getElementById('modal-avatar').innerText = r.nombre.charAt(0) + r.apellido.charAt(0);
+        document.getElementById('modal-name').innerText = `${r.nombre} ${r.apellido}`;
+        
+        const badge = document.getElementById('modal-type');
+        badge.className = 'badge ' + (r.tipo === 'Precursor Regular' ? 'badge-reg' : (r.tipo === 'Precursor Auxiliar' ? 'badge-aux' : 'badge-pub'));
+        badge.innerText = r.tipo;
+
+        document.getElementById('modal-obs').innerText = r.observaciones || "Sin observaciones.";
+
+        // Calcular promedios personales (Historial)
+        const historyReports = allReports.filter(rep => 
+            normalizeStr(rep.nombre) === normalizeStr(r.nombre) && 
+            normalizeStr(rep.apellido) === normalizeStr(rep.apellido)
+        );
+        
+        const avgH = historyReports.length ? (historyReports.reduce((a,b)=>a+(b.horas||0),0) / historyReports.length).toFixed(1) : 0;
+        const avgS = historyReports.length ? (historyReports.reduce((a,b)=>a+(b.estudios||0),0) / historyReports.length).toFixed(1) : 0;
+        
+        document.getElementById('personal-avg-hours').innerText = avgH;
+        document.getElementById('personal-avg-studies').innerText = avgS;
+
+        renderUserChart(historyReports);
+    }
+
+    function closeUserModal(e) {
+        if(e && e.target !== document.getElementById('user-modal')) return; 
+        document.getElementById('user-modal').classList.remove('active');
+    }
+
+    // --- GRÁFICOS ---
+    function renderGlobalChart(metric) {
+        const ctx = document.getElementById('globalChart').getContext('2d');
+        const labels = [];
+        const dataValues = [];
+        
+        const now = new Date();
+        if(now.getDate() <= 10) now.setMonth(now.getMonth() - 1);
+
+        for(let i=5; i>=0; i--){
+            const d = new Date(now);
+            d.setMonth(d.getMonth() - i);
+            const k = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+            labels.push(d.toLocaleDateString('es-ES', {month:'short'}));
             
-            // Usamos las fechas de servicio para la gráfica
-            const labels = historyData.map(d => {
-                // Parseamos mes_servicio (YYYY-MM)
-                const parts = d.mes_servicio.split('-');
-                const date = new Date(parts[0], parts[1]-1, 1); 
-                return date.toLocaleDateString('es-ES', {month:'short'});
-            });
-            const dataH = historyData.map(d => d.horas || 0);
-
-            if(userChartInstance) userChartInstance.destroy();
-
-            userChartInstance = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Horas',
-                        data: dataH,
-                        backgroundColor: '#000000',
-                        borderRadius: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { grid: { display: false } },
-                        y: { display: false }
-                    }
-                }
-            });
+            const reports = allReports.filter(r => r.mes_servicio === k);
+            const sum = reports.reduce((acc, curr) => acc + (curr[metric] || 0), 0);
+            dataValues.push(sum);
         }
 
-        function closeUserModal(e) {
-            if (e && e.target !== e.currentTarget) return;
-            document.getElementById('user-modal').classList.remove('active');
-        }
+        const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+        const color = metric === 'horas' ? '#007AFF' : '#F59E0B'; 
+        
+        gradient.addColorStop(0, metric === 'horas' ? 'rgba(0,122,255, 0.2)' : 'rgba(245,158,11, 0.2)');
+        gradient.addColorStop(1, 'rgba(255,255,255, 0)');
 
-    </script>
+        if(globalChartInstance) globalChartInstance.destroy();
+
+        globalChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: metric === 'horas' ? 'Horas' : 'Estudios',
+                    data: dataValues,
+                    borderColor: color,
+                    backgroundColor: gradient,
+                    borderWidth: 2,
+                    pointBackgroundColor: '#fff',
+                    pointBorderColor: color,
+                    pointRadius: 4,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true, grid: { borderDash: [5, 5] } }, x: { grid: { display: false } } }
+            }
+        });
+    }
+
+    function renderUserChart(userReports) {
+        const ctx = document.getElementById('userChart').getContext('2d');
+        const labels = [];
+        const hoursData = [];
+
+        // Ordenar cronológicamente para el gráfico
+        const sorted = [...userReports].sort((a,b) => a.timestamp_servicio - b.timestamp_servicio).slice(-6);
+
+        sorted.forEach(r => {
+            const d = new Date(r.timestamp_servicio);
+            labels.push(d.toLocaleDateString('es-ES', {month:'short'}));
+            hoursData.push(r.horas || 0);
+        });
+
+        if(userChartInstance) userChartInstance.destroy();
+        
+        userChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Horas',
+                    data: hoursData,
+                    backgroundColor: '#000000',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: { y: { beginAtZero: true }, x: { grid: { display: false } } }
+            }
+        });
+    }
+    
+    function switchGlobalChart(metric, btn) {
+        currentMetric = metric;
+        document.querySelectorAll('.segment-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        renderGlobalChart(metric);
+    }
+</script>
 </body>
 </html>
