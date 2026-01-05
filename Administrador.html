@@ -456,64 +456,88 @@
             renderGlobalChart(metric);
         }
 
-        // --- GRÁFICA GLOBAL (BASADA EN MES DE SERVICIO) ---
-        function renderGlobalChart(metric) {
-            const ctx = document.getElementById('globalChart').getContext('2d');
-            const labels = [];
-            const dataValues = [];
-            
-            // Usamos lógica de Mes de Servicio para los últimos 6 meses
-            // Asumimos el mes "actual" basado en la fecha de hoy con la regla de 10 días
-            const now = new Date();
-            if(now.getDate() <= 10) now.setMonth(now.getMonth() - 1);
+     function renderGlobalChart(metric) {
+    const ctx = document.getElementById('globalChart').getContext('2d');
+    const labels = [];
+    const dataValues = [];
+    
+    // Usamos lógica de Mes de Servicio para los últimos 6 meses
+    const now = new Date();
+    if(now.getDate() <= 10) now.setMonth(now.getMonth() - 1);
 
-            for(let i=5; i>=0; i--){
-                const d = new Date(now);
-                d.setMonth(d.getMonth() - i);
-                const k = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-                
-                labels.push(d.toLocaleDateString('es-ES', {month:'short'}));
-                
-                // Filtro importante: usar mes_servicio
-                const reports = allReports.filter(r => r.mes_servicio === k);
-                const sum = reports.reduce((acc, curr) => acc + (curr[metric] || 0), 0);
-                dataValues.push(sum);
-            }
+    for(let i=5; i>=0; i--){
+        const d = new Date(now);
+        d.setMonth(d.getMonth() - i);
+        const k = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+        
+        // Etiqueta del eje X (Ej: Ene, Feb)
+        labels.push(d.toLocaleDateString('es-ES', {month:'short'}));
+        
+        const reports = allReports.filter(r => r.mes_servicio === k);
+        const sum = reports.reduce((acc, curr) => acc + (curr[metric] || 0), 0);
+        dataValues.push(sum);
+    }
 
-            const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-            const color = metric === 'horas' ? '#007AFF' : '#F59E0B'; 
-            gradient.addColorStop(0, metric === 'horas' ? 'rgba(0,122,255, 0.2)' : 'rgba(245,158,11, 0.2)');
-            gradient.addColorStop(1, 'rgba(255,255,255, 0)');
+    const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+    const color = metric === 'horas' ? '#007AFF' : '#F59E0B'; 
+    const labelText = metric === 'horas' ? 'Horas' : 'Estudios'; // Texto para el tooltip
 
-            if(globalChartInstance) globalChartInstance.destroy();
+    gradient.addColorStop(0, metric === 'horas' ? 'rgba(0,122,255, 0.2)' : 'rgba(245,158,11, 0.2)');
+    gradient.addColorStop(1, 'rgba(255,255,255, 0)');
 
-            globalChartInstance = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        data: dataValues,
-                        borderColor: color,
-                        backgroundColor: gradient,
-                        borderWidth: 2,
-                        pointBackgroundColor: '#fff',
-                        pointBorderColor: color,
-                        pointRadius: 3,
-                        fill: true,
-                        tension: 0.4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        x: { grid: { display: false }, ticks: { font: { size: 10 } } },
-                        y: { display: false }
+    if(globalChartInstance) globalChartInstance.destroy();
+
+    globalChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: labelText, // <--- 1. Importante para que salga el nombre
+                data: dataValues,
+                borderColor: color,
+                backgroundColor: gradient,
+                borderWidth: 2,
+                pointBackgroundColor: '#fff',
+                pointBorderColor: color,
+                pointRadius: 4,     // Aumenté un poco el radio para facilitar la vista
+                pointHitRadius: 20, // Aumenta el área táctil alrededor del punto
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',      // Muestra el dato al tocar cualquier parte de la columna vertical (no solo el punto)
+                intersect: false,   // No requiere tocar el punto exacto
+            },
+            plugins: { 
+                legend: { display: false },
+                tooltip: {
+                    enabled: true,
+                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                    titleColor: '#000',
+                    bodyColor: '#666',
+                    borderColor: '#E0E0E0',
+                    borderWidth: 1,
+                    displayColors: true,
+                    boxPadding: 4,
+                    padding: 10,
+                    callbacks: {
+                        label: function(context) {
+                            return ` ${context.dataset.label}: ${context.parsed.y}`;
+                        }
                     }
                 }
-            });
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { font: { size: 10 } } },
+                y: { display: false } // Mantiene el eje Y oculto para limpieza visual
+            }
         }
+    });
+}
 
         // --- LISTA (FILTRADA POR MES DE SERVICIO) ---
         function renderList() {
