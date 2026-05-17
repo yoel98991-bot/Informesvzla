@@ -15,12 +15,49 @@
       background: #f2f2f7; color: #1c1c1e; padding-bottom: 90px;
       -webkit-font-smoothing: antialiased;
     }
+
+    /* ===== QUITAR CUADRO AZUL AL TOCAR ===== */
+    * {
+      -webkit-tap-highlight-color: transparent;
+    }
+    input:focus, button:focus, select:focus, textarea:focus {
+      outline: none !important;
+      box-shadow: none !important;
+    }
+    button, .tab, .icon-btn, .btn, .grid-card {
+      outline: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* ======================================== */
+
     .status-bar {
       background: #f2f2f7; padding: 12px 20px 6px; display: flex; justify-content: space-between;
       font-size: 15px; font-weight: 600; color: #1c1c1e; border-bottom: 1px solid #c6c6c8;
     }
-    .app-header { padding: 16px 20px 8px; }
-    .app-header h1 { font-size: 34px; font-weight: 700; letter-spacing: -0.5px; color: #1c1c1e; }
+    .app-header { 
+      padding: 16px 20px 8px; 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center;
+    }
+    .app-header h1 { 
+      font-size: 34px; font-weight: 700; letter-spacing: -0.5px; color: #1c1c1e; 
+      margin: 0;
+    }
+    .header-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .header-actions .icon-btn {
+      width: 36px; height: 36px; 
+      background: #f2f2f7; 
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #007aff;
+      font-size: 18px;
+    }
     .app-container { max-width: 500px; margin: 0 auto; background: #f2f2f7; min-height: 100vh; position: relative; }
     
     /* Pestañas */
@@ -161,7 +198,13 @@
   </div>
   <div class="app-header">
     <h1>Almacén <span style="font-weight: 400; color: #8e8e93;">Pro</span></h1>
+    <div class="header-actions">
+      <button class="icon-btn" id="btn-exportar" title="Guardar respaldo"><i class="fas fa-download"></i></button>
+      <button class="icon-btn" id="btn-importar" title="Restaurar respaldo"><i class="fas fa-upload"></i></button>
+    </div>
   </div>
+
+  <input type="file" id="input-importar" accept=".json" style="display:none;">
 
   <div class="tab-bar">
     <button class="tab active" data-tab="inventario"><i class="fas fa-box"></i> Stock</button>
@@ -463,30 +506,31 @@
     "use strict";
 
     // Productos bases actualizados con formato Genaro (costo y precio)
+    // TODAS LAS CANTIDADES EN CERO
     const PRODUCTOS_INICIALES = [
-      { nombre: "Harina", cantidad: 3, unidad: "sacos", costo: 38.5, precio: 0 },
-      { nombre: "Azúcar", cantidad: 2, unidad: "sacos", costo: 66.0, precio: 0 },
-      { nombre: "Manteca", cantidad: 25, unidad: "kg", costo: 3.5, precio: 0 }, 
-      { nombre: "Micovan", cantidad: 2.5, unidad: "kg", costo: 7.0, precio: 0 },
-      { nombre: "Bicarbonato", cantidad: 8, unidad: "kg", costo: 6.0, precio: 0 },
-      { nombre: "Polvo de hornear", cantidad: 3, unidad: "kg", costo: 6.0, precio: 0 },
-      { nombre: "Esencias vainilla y anís", cantidad: 0.5, unidad: "kg", costo: 5.0, precio: 0 },
-      { nombre: "Sabor vainilla", cantidad: 0.5, unidad: "kg", costo: 5.0, precio: 0 },
-      { nombre: "Colorante", cantidad: 0.25, unidad: "L", costo: 11.0, precio: 0 },
-      { nombre: "Guayaba", cantidad: 15, unidad: "kg", costo: 2.0, precio: 0 }, 
-      { nombre: "Arequipe (Tobo)", cantidad: 10, unidad: "kg", costo: 4.0, precio: 0 },
-      { nombre: "Levadura", cantidad: 2, unidad: "kg", costo: 5.0, precio: 0 },
-      { nombre: "Bolsas 1k", cantidad: 400, unidad: "unidades", costo: 0.012, precio: 0 },
-      { nombre: "Bolsas 22x60", cantidad: 200, unidad: "unidades", costo: 0.028, precio: 0 },
-      { nombre: "Bolsas 24x60", cantidad: 150, unidad: "unidades", costo: 0.03, precio: 0 },
-      { nombre: "Bolsas 20x50", cantidad: 200, unidad: "unidades", costo: 0.025, precio: 0 },
-      { nombre: "Bolsas canilla 3", cantidad: 100, unidad: "unidades", costo: 0.025, precio: 0 },
-      { nombre: "Anís en granos", cantidad: 3, unidad: "kg", costo: 4.0, precio: 0 },
-      { nombre: "Sal", cantidad: 12, unidad: "kg", costo: 0.5, precio: 0 },
-      { nombre: "Coco", cantidad: 5, unidad: "kg", costo: 7.0, precio: 0 },
-      { nombre: "Frutilla", cantidad: 2, unidad: "kg", costo: 8.0, precio: 0 },
+      { nombre: "Harina", cantidad: 0, unidad: "sacos", costo: 38.5, precio: 0 },
+      { nombre: "Azúcar", cantidad: 0, unidad: "sacos", costo: 66.0, precio: 0 },
+      { nombre: "Manteca", cantidad: 0, unidad: "kg", costo: 3.5, precio: 0 }, 
+      { nombre: "Micovan", cantidad: 0, unidad: "kg", costo: 7.0, precio: 0 },
+      { nombre: "Bicarbonato", cantidad: 0, unidad: "kg", costo: 6.0, precio: 0 },
+      { nombre: "Polvo de hornear", cantidad: 0, unidad: "kg", costo: 6.0, precio: 0 },
+      { nombre: "Esencias vainilla y anís", cantidad: 0, unidad: "kg", costo: 5.0, precio: 0 },
+      { nombre: "Sabor vainilla", cantidad: 0, unidad: "kg", costo: 5.0, precio: 0 },
+      { nombre: "Colorante", cantidad: 0, unidad: "L", costo: 11.0, precio: 0 },
+      { nombre: "Guayaba", cantidad: 0, unidad: "kg", costo: 2.0, precio: 0 }, 
+      { nombre: "Arequipe (Tobo)", cantidad: 0, unidad: "kg", costo: 4.0, precio: 0 },
+      { nombre: "Levadura", cantidad: 0, unidad: "kg", costo: 5.0, precio: 0 },
+      { nombre: "Bolsas 1k", cantidad: 0, unidad: "unidades", costo: 0.012, precio: 0 },
+      { nombre: "Bolsas 22x60", cantidad: 0, unidad: "unidades", costo: 0.028, precio: 0 },
+      { nombre: "Bolsas 24x60", cantidad: 0, unidad: "unidades", costo: 0.03, precio: 0 },
+      { nombre: "Bolsas 20x50", cantidad: 0, unidad: "unidades", costo: 0.025, precio: 0 },
+      { nombre: "Bolsas canilla 3", cantidad: 0, unidad: "unidades", costo: 0.025, precio: 0 },
+      { nombre: "Anís en granos", cantidad: 0, unidad: "kg", costo: 4.0, precio: 0 },
+      { nombre: "Sal", cantidad: 0, unidad: "kg", costo: 0.5, precio: 0 },
+      { nombre: "Coco", cantidad: 0, unidad: "kg", costo: 7.0, precio: 0 },
+      { nombre: "Frutilla", cantidad: 0, unidad: "kg", costo: 8.0, precio: 0 },
 
-      // Paquetes y sueltas (12 fórmulas)
+      // Paquetes y sueltas (12 fórmulas) también en cero
       { nombre: "Paquete Catalinas 1kg", cantidad: 0, unidad: "unidades", costo: 0, precio: 3.0 },
       { nombre: "Catalinas sueltas (unidad)", cantidad: 0, unidad: "unidades", costo: 0, precio: 0.3 },
       { nombre: "Paquete Polvorosas 1kg", cantidad: 0, unidad: "unidades", costo: 0, precio: 3.5 },
@@ -515,7 +559,7 @@
 
     const UNIDADES_PERMITIDAS = ['sacos', 'kg', 'g', 'L', 'ml', 'unidades'];
 
-    // LAS 12 RECETAS EXACTAS
+    // LAS 12 RECETAS EXACTAS (NO SE TOCAN)
     const RECETAS_PREDEF = [
       { // 1. Catalinas
         id: 'catalinas', nombre: 'Catalinas', unidadProduccion: 'bandejas', unidadesPorProduccion: 24,
@@ -728,7 +772,6 @@
       const cGuardados = localStorage.getItem('almacen_fusion_clientes_v7_esencias');
       clientes = cGuardados ? JSON.parse(cGuardados) : [];
 
-      // Cargar gastos operativos
       const gGuardados = localStorage.getItem('almacen_fusion_gastos_v7_esencias');
       gastos = gGuardados ? JSON.parse(gGuardados) : [];
     }
@@ -846,6 +889,11 @@
       }
       document.getElementById('modal-ingreso').classList.add('active');
     };
+
+    // Evento para cerrar modal de ingreso (corregido)
+    document.getElementById('cerrar-modal-ingreso').addEventListener('click', () => {
+      document.getElementById('modal-ingreso').classList.remove('active');
+    });
 
     document.getElementById('guardar-ingreso').addEventListener('click', () => {
       const cantIngresada = parseFloat(document.getElementById('cantidad-ingreso').value);
@@ -1381,6 +1429,53 @@
         gastos = []; 
         guardarDatos(); 
       }
+    });
+
+    // ---------- EXPORTAR / IMPORTAR JSON ----------
+    function exportarDatos() {
+      const datos = {
+        productos, recetas, ventas, clientes, gastos
+      };
+      const blob = new Blob([JSON.stringify(datos, null, 2)], {type: 'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'almacen_respaldo.json';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      mostrarToast('📁 Respaldo guardado', 2000);
+    }
+
+    document.getElementById('btn-exportar').addEventListener('click', exportarDatos);
+    document.getElementById('btn-importar').addEventListener('click', () => {
+      document.getElementById('input-importar').click();
+    });
+
+    document.getElementById('input-importar').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const datos = JSON.parse(ev.target.result);
+          if (datos.productos && Array.isArray(datos.productos) && datos.recetas && Array.isArray(datos.recetas) && Array.isArray(datos.ventas) && Array.isArray(datos.clientes) && Array.isArray(datos.gastos)) {
+            localStorage.setItem('almacen_fusion_productos_v7_esencias', JSON.stringify(datos.productos));
+            localStorage.setItem('almacen_fusion_recetas_v7_esencias', JSON.stringify(datos.recetas));
+            localStorage.setItem('almacen_fusion_ventas_v7_esencias', JSON.stringify(datos.ventas));
+            localStorage.setItem('almacen_fusion_clientes_v7_esencias', JSON.stringify(datos.clientes));
+            localStorage.setItem('almacen_fusion_gastos_v7_esencias', JSON.stringify(datos.gastos));
+            mostrarToast('✅ Datos restaurados. Recargando...', 1500);
+            setTimeout(() => location.reload(), 1200);
+          } else {
+            mostrarToast('❌ El archivo no tiene el formato correcto.', 3000);
+          }
+        } catch (err) {
+          mostrarToast('❌ Error al leer el archivo JSON.', 3000);
+        }
+      };
+      reader.readAsText(file);
     });
 
     // Eventos y UI General
