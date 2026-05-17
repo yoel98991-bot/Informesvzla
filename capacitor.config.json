@@ -1,0 +1,6 @@
+{
+  "appId": "com.genaro.almacen",
+  "appName": "Almacén Pro",
+  "webDir": "www",
+  "bundledWebRuntime": false
+}
